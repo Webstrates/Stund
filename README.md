@@ -21,7 +21,7 @@ Find the documentation in the [docs](docs) folder.
 
 ## Research Paper ([PDF](https://pure.au.dk/ws/portalfiles/portal/472319208/StundUIST2026AuthorsCopy.pdf))
 
-> Marcel Borowski, Janus Bager Kristensen, Payod Panda, Sean Rintel, Niklas Elmqvist, Jens Emil Grønbœk, and Clemens N. Klokmose. 2026. Stund: Activity-Enriched Collaborative Workspaces Mediated by Artificial Intelligence. In *Proceedings of the 39th Annual ACM Symposium on User Interface Software and Technology (UIST ’26)*. ACM. https://doi.org/10.1145/10.1145/3830398.3830508.
+> Marcel Borowski, Janus Bager Kristensen, Payod Panda, Sean Rintel, Niklas Elmqvist, Jens Emil Grønbœk, and Clemens N. Klokmose. 2026. Stund: Activity-Enriched Collaborative Workspaces Mediated by Artificial Intelligence. In *Proceedings of the 39th Annual ACM Symposium on User Interface Software and Technology (UIST ’26)*. ACM. DOI: [10.1145/3830398.3830508](https://doi.org/10.1145/3830398.3830508).
 
 ```bibtex
 @inproceedings{Stund2026,
@@ -31,6 +31,6 @@ Find the documentation in the [docs](docs) folder.
     booktitle = {Proceedings of the 39th Annual ACM Symposium on User Interface Software and Technology},
     series    = {UIST '26},
     publisher = {Association for Computing Machinery},
-    doi       = {10.1145/10.1145/3830398.3830508},
+    doi       = {10.1145/3830398.3830508},
 }
 ```
