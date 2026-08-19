@@ -1,0 +1,28 @@
+{
+    "name": "Stund",
+    "short_name": "Stund",
+    "description": "Activity-Enriched Collaborative Workspaces Mediated by Artificial Intelligence",
+    "id": "webstrates.stund",
+    "start_url": "./",
+    "scope": "./",
+    "display": "standalone",
+    "background_color": "#222222",
+    "theme_color": "#222222",
+    "icons": [
+        {
+            "src": "stund-icons.zip/icon_512.png",
+            "type": "image/png",
+            "sizes": "512x512"
+        },
+        {
+            "src": "stund-icons.zip/icon_128.png",
+            "type": "image/png",
+            "sizes": "128x128"
+        },
+        {
+            "src": "stund-icons.zip/icon_32.png",
+            "type": "image/png",
+            "sizes": "32x32"
+        }
+    ]
+}
