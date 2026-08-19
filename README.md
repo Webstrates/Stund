@@ -1,7 +1,5 @@
 <p align="center">
-    <a href="https://demo.webstrates.net/new?prototypeUrl=https://github.com/Webstrates/Stund/raw/main/prototypes/stund.zip" title="Create a new Stund Workspace">
-        <img src="./docs/logo.svg" width="128" />
-    </a>
+    <img src="./docs/logo.svg" width="128" />
 </p>
 
 <h1 align="center">Stund</h1>
