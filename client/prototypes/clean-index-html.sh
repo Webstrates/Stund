@@ -25,12 +25,33 @@ perl -0777 -pi -e '
     s/\sdata-auth(?:\s*=\s*(?:"[^"]*"|'\''[^'\'']*'\''|[^\s>]+))?//g;
     s/\s__wid(?:\s*=\s*(?:"[^"]*"|'\''[^'\'']*'\''|[^\s>]+))?//g;
 
-    # Empty varv-data element
-    s/(<varv-data[^>]*>).*?(<\/varv-data>)/$1$2/gs;
+    # Matches the body of an element, honouring nesting of that same tag, so
+    # that it cannot stop at the closing tag of a nested child of the same kind.
+    sub body_of {
+        my $tag = quotemeta shift;
+        return qr{
+            (?<body>
+                (?:
+                      [^<]+                                 # text
+                    | <(?!/?$tag\b)                         # any other tag
+                    | <$tag\b[^>]*>(?&body)</$tag\s*>       # nested same-tag element
+                )*
+            )
+        }xs;
+    }
+    my $folder_body = body_of("code-folder");
+    my $store_body  = body_of("dom-store");
+    my $tldraw_body = body_of("tldraw-document");
 
-    # Empty dataset- and spec-container element
-    s/(<[^>]*class="[^"]*dataset-container[^"]*"[^>]*>).*?(<\/[^>]+>)/$1$2/gs;
-    s/(<[^>]*class="[^"]*spec-container[^"]*"[^>]*>).*?(<\/[^>]+>)/$1$2/gs;
+    # Empty document-, processor- and widget-fragment elements
+    s{(<code-folder\b[^>]*\bid="[^"]*document-fragments[^"]*"[^>]*>)$folder_body</code-folder\s*>}{$1</code-folder>}gs;
+    s{(<code-folder\b[^>]*\bid="[^"]*processor-fragments[^"]*"[^>]*>)$folder_body</code-folder\s*>}{$1</code-folder>}gs;
+    s{(<code-folder\b[^>]*\bid="[^"]*widget-fragments[^"]*"[^>]*>)$folder_body</code-folder\s*>}{$1</code-folder>}gs;
+
+    # Empty dom-store and tldraw data elements
+    s{(<dom-store\b[^>]*\bdata-store-id="[^"]*"[^>]*>)$store_body</dom-store\s*>}{$1</dom-store>}gs;
+    s{(<code-folder\b[^>]*\bid="[^"]*widget-stores[^"]*"[^>]*>)$folder_body</code-folder\s*>}{$1</code-folder>}gs;
+    s{(<tldraw-document\b[^>]*>)$tldraw_body</tldraw-document\s*>}{$1</tldraw-document>}gs;
 
     # Remove empty id, name, and class attributes
     s/(<[^>]*)\sid\s*=\s*(?:""|'\'''\''|\s+)([^>]*>)/$1$2/g;
