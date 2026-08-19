@@ -1,0 +1,15 @@
+{
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "description": "Schema for shape created event.",
+    "type": "object",
+    "properties": {
+        "shape": {
+            "$ref": "shape.json",
+            "description": "The shape that was created"
+        }
+    },
+    "required": [
+        "shape"
+    ],
+    "additionalProperties": false
+}

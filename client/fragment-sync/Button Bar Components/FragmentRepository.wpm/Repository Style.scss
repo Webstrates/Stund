@@ -1,0 +1,426 @@
+.fragment-repository-dialog {
+    max-width: 1280px !important;
+
+    .chip {
+        border-color: #c5ddf5;
+
+        &:hover {
+            background: #e3f2fd;
+            border-color: #90caf9;
+        }
+
+        &.selected .chip-action-btn.delete-btn:hover {
+            background: rgba(255, 255, 255, 0.3);
+
+            .icon {
+                color: #ffcdd2;
+            }
+        }
+    }
+
+    .fragments-container {
+        display: flex;
+        gap: 16px;
+        flex: 1;
+        min-height: 200px;
+        overflow: hidden;
+    }
+
+    .fragments-section {
+        display: flex;
+        flex-direction: column;
+        flex: 1;
+        gap: 8px;
+        padding: 12px;
+        background: #f1f1f1;
+        border: 1px solid #e0e0e0;
+        border-radius: 8px;
+        overflow: hidden;
+        min-height: 0;
+
+        .section-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+
+            h3 {
+                font-size: 14px;
+                font-weight: 600;
+                color: #333;
+            }
+        }
+
+        &.repository-section {
+            background: #f0f7ff;
+            border-color: #c5ddf5;
+        }
+
+        .create-folder-btn {
+            background: transparent;
+            border: 1px solid #c5ddf5;
+
+            .icon {
+                color: #1976d2;
+            }
+
+            &:hover {
+                background: #e3f2fd;
+            }
+        }
+
+        .fragments-list {
+            flex: 1;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+
+            .empty-message {
+                color: #888;
+                font-size: 13px;
+                font-style: italic;
+                text-align: center;
+                padding: 20px;
+            }
+        }
+    }
+
+    .fragment-item {
+        display: flex;
+        flex-direction: column;
+        background: #fff;
+        border: 1px solid #e0e0e0;
+        border-radius: 6px;
+        transition: all 0.15s ease;
+
+        &.expanded {
+            border-color: #bbb;
+        }
+
+        &.repository {
+            background: #e8f4fd;
+            border-color: #b8d8f5;
+
+            &.expanded {
+                border-color: #90c0e8;
+            }
+        }
+
+        .fragment-header {
+            display: flex;
+            align-items: center;
+            padding: 6px 10px;
+            cursor: pointer;
+            gap: 6px;
+            user-select: none;
+
+            &:hover {
+                background: rgba(0, 0, 0, 0.03);
+            }
+
+            .expand-icon {
+                font-size: 18px;
+                color: #888;
+                flex-shrink: 0;
+            }
+        }
+
+        .fragment-name {
+            font-size: 13px;
+            font-weight: 500;
+            color: #333;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            flex: 1;
+        }
+
+        .fragment-name-input {
+            font-size: 13px;
+            font-weight: 500;
+            color: #333;
+            flex: 1;
+            padding: 2px 6px;
+            border: 1px solid #1976d2 !important;
+            border-radius: 4px;
+            outline: none;
+            background: #fff;
+        }
+
+        .instance-count {
+            font-size: 11px;
+            font-weight: 500;
+            color: #555;
+            background: #e8e8e8;
+            padding: 2px 5px;
+            border-radius: 4px;
+            margin-right: 4px;
+            min-width: 8px;
+            text-align: center;
+        }
+
+        .fragment-actions {
+            display: flex;
+            gap: 2px;
+            flex-shrink: 0;
+        }
+
+        .fragment-action-btn {
+            background: transparent;
+            border: none;
+            padding: 4px;
+            border-radius: 4px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            opacity: 0.5;
+            transition: all 0.15s ease;
+
+            .icon {
+                font-size: 16px;
+                color: #555;
+            }
+
+            &:hover {
+                opacity: 1;
+                background: rgba(0, 0, 0, 0.08);
+            }
+
+            &.delete-btn:hover {
+                background: #ffebee;
+
+                .icon {
+                    color: #e53935;
+                }
+            }
+        }
+
+        .fragment-details {
+            padding: 8px 12px;
+            border-top: 1px solid #e0e0e0;
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+
+            .description-label {
+                font-size: 11px;
+                font-weight: 600;
+                color: #666;
+                text-transform: uppercase;
+            }
+
+            .description-input {
+                font-size: 12px;
+                padding: 0;
+                border: none;
+                border-radius: 4px;
+                resize: none;
+                font-family: inherit;
+
+                &:focus {
+                    outline: none;
+                    border-color: #1976d2;
+                }
+            }
+
+            .description-text,
+            .fragment-timestamp,
+            .fragment-from-document {
+                font-size: 12px;
+                color: #444;
+                margin: 0;
+                line-height: 1.5;
+                white-space: pre-wrap;
+
+                &.empty {
+                    color: #999;
+                    font-style: italic;
+                }
+
+                &:before {
+                    font-family: 'Material Symbols Outlined';
+                    font-variation-settings: "FILL" 1, "GRAD" 0, "opsz" 24;
+                    font-size: 14px;
+                    vertical-align: middle;
+                    margin-right: 4px;
+                    color: #888;
+                    font-style: normal;
+                }
+            }
+
+            .description-text:before {
+                content: 'description';
+            }
+
+            .fragment-timestamp:before {
+                content: 'access_time';
+            }
+
+            .fragment-from-document:before {
+                content: 'source';
+            }
+        }
+
+        &.repository .fragment-details {
+            border-top-color: #b8d8f5;
+        }
+    }
+
+    // Small button already defined in base Dialog Style
+
+    button.folder-delete:hover {
+        background: #ffebee !important;
+
+        .icon {
+            color: #e53935;
+        }
+    }
+
+    .repository-folder {
+        flex: 0 0 auto;
+        display: flex;
+        flex-direction: column;
+        border: 1px solid #c5ddf5;
+        border-radius: 6px;
+        overflow: hidden;
+        background: #fff;
+
+        &.selected {
+            border-color: #1976d2;
+
+            .folder-header {
+                background: #bbdefb;
+            }
+        }
+
+        .folder-header {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 8px 12px;
+            background: #e3f2fd;
+            cursor: pointer;
+            user-select: none;
+            transition: background 0.15s ease;
+
+            &:hover {
+                background: #d0e8fc;
+            }
+
+            .icon {
+                font-size: 18px;
+                color: #1976d2;
+            }
+
+            .folder-name {
+                font-size: 13px;
+                font-weight: 600;
+                color: #333;
+                flex: 1;
+                overflow: hidden;
+                text-overflow: ellipsis;
+                white-space: nowrap;
+            }
+
+            .folder-name-input {
+                font-size: 13px;
+                font-weight: 600;
+                color: #333;
+                flex: 1;
+                padding: 2px 6px;
+                border: 1px solid #1976d2;
+                border-radius: 4px;
+                outline: none;
+                background: #fff;
+            }
+
+            .fragment-count {
+                font-size: 11px;
+                font-weight: 500;
+                color: #555;
+                background: #90c0e8;
+                padding: 2px 5px;
+                border-radius: 4px;
+                min-width: 8px;
+                text-align: center;
+            }
+
+            .button.folder-delete {
+                background: transparent;
+                border: none;
+                height: 20px;
+                width: 20px;
+
+                .icon {
+                    color: #777;
+                }
+
+                &:hover {
+                    background: #ffcdd2;
+
+                    .icon {
+                        color: #e53935;
+                    }
+                }
+            }
+
+            .button.folder-rename {
+                background: transparent;
+                border: none;
+                height: 20px;
+                width: 20px;
+
+                .icon {
+                    color: #777;
+                }
+
+                &:hover {
+                    background: #e3f2fd;
+
+                    .icon {
+                        color: #1976d2;
+                    }
+                }
+            }
+        }
+
+        .folder-contents {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            padding: 8px;
+
+            .empty-message {
+                padding: 8px;
+            }
+
+            .folder-description {
+                margin-bottom: 4px;
+
+                .description-input {
+                    width: 100%;
+                    font-size: 12px;
+                    padding: 8px;
+                    border: 1px solid #c5ddf5;
+                    border-radius: 4px;
+                    resize: none;
+                    font-family: inherit;
+                    background: #f8fbff;
+                    box-sizing: border-box;
+
+                    &:focus {
+                        outline: none;
+                        border-color: #1976d2;
+                        background: #fff;
+                    }
+
+                    &::placeholder {
+                        color: #999;
+                        font-style: italic;
+                    }
+                }
+            }
+        }
+    }
+}

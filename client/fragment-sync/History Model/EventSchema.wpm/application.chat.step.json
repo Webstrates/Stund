@@ -1,0 +1,52 @@
+{
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "description": "Schema for a single execution/progress step instant event.",
+    "type": "object",
+    "properties": {
+        "chatId": {
+            "type": "string",
+            "description": "The chat/tab identifier that produced the entry."
+        },
+        "entryId": {
+            "type": "string",
+            "description": "The unique identifier of the chat entry this step belongs to."
+        },
+        "entryIndex": {
+            "type": "integer",
+            "description": "Index of the parent entry for ordering (1-based)."
+        },
+        "stepIndex": {
+            "type": "integer",
+            "description": "Index of this step within the entry for ordering (1-based)."
+        },
+        "type": {
+            "type": "string",
+            "description": "Step type identifier (for example stack/tool/slop states)."
+        },
+        "description": {
+            "type": "string",
+            "description": "Step description (for example which tool or slop was used)."
+        },
+        "arguments": {
+            "type": "array",
+            "description": "Optional tool/slop call arguments.",
+            "items": {}
+        },
+        "returnValue": {
+            "description": "Optional tool/slop return value."
+        },
+        "exception": {
+            "type": "string",
+            "description": "Optional exception message for exception steps."
+        }
+    },
+    "required": [
+        "chatId",
+        "entryId",
+        "entryIndex",
+        "stepIndex",
+        "type",
+        "description"
+    ],
+    "additionalProperties": false
+}

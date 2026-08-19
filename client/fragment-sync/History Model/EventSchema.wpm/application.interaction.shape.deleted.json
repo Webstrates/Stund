@@ -1,0 +1,15 @@
+{
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "description": "Schema for shape deleted event.",
+    "type": "object",
+    "properties": {
+        "shape": {
+            "$ref": "shape.json",
+            "description": "The shape that was deleted"
+        }
+    },
+    "required": [
+        "shape"
+    ],
+    "additionalProperties": false
+}

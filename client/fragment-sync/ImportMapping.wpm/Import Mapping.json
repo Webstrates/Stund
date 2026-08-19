@@ -1,0 +1,13 @@
+{
+    "imports": {
+        "fflate": "https://esm.sh/fflate@0.8.3?dev&target=es2022&external=react,react-dom,react-error-boundary,react-vega,tldraw",
+        "react": "https://esm.sh/react@19.2.8?dev&target=es2022&external=fflate,react-dom,react-error-boundary,react-vega,tldraw",
+        "react-dom": "https://esm.sh/react-dom@19.2.8?dev&target=es2022&external=fflate,react,react-error-boundary,react-vega,tldraw",
+        "react-dom/client": "https://esm.sh/react-dom@19.2.8/client?dev&target=es2022&external=fflate,react,react-error-boundary,react-vega,tldraw",
+        "react-error-boundary": "https://esm.sh/react-error-boundary@6.1.2?dev&target=es2022&external=fflate,react,react-dom,react-vega,tldraw",
+        "react-vega": "https://esm.sh/react-vega@8.0.0?dev&target=es2022&external=fflate,react,react-dom,react-error-boundary,tldraw",
+        "tldraw": "https://esm.sh/tldraw@5.3.0?dev&target=es2022&external=fflate,react,react-dom,react-error-boundary,react-vega",
+        "tldraw/tldraw.css": "https://esm.sh/tldraw@5.3.0/tldraw.css?dev&target=es2022&external=fflate,react,react-dom,react-error-boundary,react-vega",
+        "react/jsx-runtime": "https://esm.sh/react@19.2.8/jsx-runtime?dev&target=es2022&external=fflate,react-dom,react-error-boundary,react-vega,tldraw"
+    }
+}

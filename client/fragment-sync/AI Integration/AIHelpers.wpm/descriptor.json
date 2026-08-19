@@ -1,0 +1,8 @@
+{
+    "description": "Shared helper utilities for AI integration features.",
+    "dependencies": [
+        "#SlopScript"
+    ],
+    "assets": [],
+    "version": "0.1.0"
+}

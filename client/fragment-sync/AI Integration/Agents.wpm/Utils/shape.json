@@ -1,0 +1,91 @@
+{
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "$id": "shape.json",
+    "description": "Schema for cleaned TLDraw shape data used in meeting recorder history.",
+    "type": "object",
+    "properties": {
+        "id": {
+            "type": "string",
+            "description": "Unique identifier for the shape, must always start with 'shape:'"
+        },
+        "type": {
+            "type": "string",
+            "description": "The type of shape (e.g., 'note', 'text', 'geo', 'image', 'draw', 'ScreenStream', 'VideoStream')"
+        },
+        "x": {
+            "type": "number",
+            "description": "The x-coordinate position of the shape on the canvas"
+        },
+        "y": {
+            "type": "number",
+            "description": "The y-coordinate position of the shape on the canvas"
+        },
+        "rotation": {
+            "type": "number",
+            "description": "The rotation angle of the shape in radians"
+        },
+        "opacity": {
+            "type": "number",
+            "description": "The opacity of the shape, from 0 (transparent) to 1 (opaque)",
+            "minimum": 0,
+            "maximum": 1
+        },
+        "props": {
+            "type": "object",
+            "description": "Shape-specific properties that vary by shape type",
+            "properties": {
+                "color": {
+                    "type": "string",
+                    "description": "The color of the shape (used in basic shapes and notes)"
+                },
+                "richText": {
+                    "type": "object",
+                    "description": "Rich text content for shapes that contain text (notes, text, and geo shapes). For writes, you may set this using toRichText(...). For reads, this is the canonical text field."
+                },
+                "text": {
+                    "type": "string",
+                    "description": "Plain text content for shape writes (notes, text, and geo shapes). This will be converted to richText automatically by helpers, but may not be present when reading shapes."
+                },
+                "w": {
+                    "type": "number",
+                    "description": "The width of the shape"
+                },
+                "h": {
+                    "type": "number",
+                    "description": "The height of the shape"
+                },
+                "url": {
+                    "type": "string",
+                    "description": "URL associated with the shape (for images or links)"
+                },
+                "assetId": {
+                    "type": "string",
+                    "description": "Reference to an asset in the TLDraw asset store (for images)"
+                },
+                "client": {
+                    "type": "string",
+                    "description": "Client identifier for video and screen stream shapes"
+                },
+                "userName": {
+                    "type": "string",
+                    "description": "User name associated with video and screen stream shapes"
+                },
+                "sourceFragmentId": {
+                    "type": "string",
+                    "description": "The ID of the code fragment that is the source for this widget shape. Never set this manually."
+                }
+            },
+            "additionalProperties": false
+        }
+    },
+    "required": [
+        "id",
+        "type",
+        "x",
+        "y",
+        "rotation",
+        "opacity",
+        "props"
+    ],
+    "additionalProperties": false
+}

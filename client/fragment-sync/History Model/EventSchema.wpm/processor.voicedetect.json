@@ -1,0 +1,22 @@
+{
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "description": "Schema for voice detection event containing audio analysis metrics.",
+    "type": "object",
+    "properties": {
+        "avgLogProb": {
+            "type": "number",
+            "description": "Average log probability of the detected speech, indicating confidence level. Higher values (closer to 0) indicate higher confidence."
+        },
+        "speechFraction": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1,
+            "description": "Fraction of the audio segment that contains speech, ranging from 0 (no speech) to 1 (all speech)."
+        }
+    },
+    "required": [
+        "avgLogProb",
+        "speechFraction"
+    ],
+    "additionalProperties": false
+}

@@ -1,0 +1,9 @@
+{
+    "description": "Shared fragment repository management interface for local and remote widgets and processors.",
+    "dependencies": [
+        "#CoreHelpers",
+        "#Dialog"
+    ],
+    "assets": [],
+    "version": "0.1.0"
+}

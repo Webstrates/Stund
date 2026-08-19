@@ -1,0 +1,324 @@
+.button-bar {
+    flex: 0 0 32px !important;
+    order: 100;
+    background: #2a2a2a;
+
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 8px;
+
+    hr {
+        width: 16px;
+        border: 0;
+        border-top: 1px solid #606060;
+    }
+
+    .button {
+        width: 32px;
+        height: 32px;
+        border-radius: 50%;
+        background: #404040;
+        color: white;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        user-select: none;
+        transition: background 0.2s ease, color 0.2s ease;
+
+        &:hover {
+            background: #505050;
+        }
+
+        &:active {
+            background: #606060;
+        }
+
+        &.red {
+            background: #f44336;
+            color: white;
+
+            &:hover {
+                background: #d32f2f;
+            }
+
+            &:active {
+                background: #b71c1c;
+            }
+        }
+
+        &.green {
+            background: #4caf50;
+            color: white;
+
+            &:hover {
+                background: #388e3c;
+            }
+
+            &:active {
+                background: #2e7d32;
+            }
+        }
+
+        &.pink {
+            background: #E91E63;
+            color: white;
+
+            &:hover {
+                background: #C2185B;
+            }
+
+            &:active {
+                background: #880E4F;
+            }
+        }
+
+        &.purple {
+            background: #9C27B0;
+            color: white;
+
+            &:hover {
+                background: #7B1FA2;
+            }
+
+            &:active {
+                background: #4A148C;
+            }
+        }
+
+        &.deep-purple {
+            background: #673AB7;
+            color: white;
+
+            &:hover {
+                background: #512DA8;
+            }
+
+            &:active {
+                background: #311B92;
+            }
+        }
+
+        &.indigo {
+            background: #3F51B5;
+            color: white;
+
+            &:hover {
+                background: #303F9F;
+            }
+
+            &:active {
+                background: #1A237E;
+            }
+        }
+
+        &.blue {
+            background: #2196F3;
+            color: white;
+
+            &:hover {
+                background: #1976D2;
+            }
+
+            &:active {
+                background: #0D47A1;
+            }
+        }
+
+        &.light-blue {
+            background: #03A9F4;
+            color: white;
+
+            &:hover {
+                background: #0288D1;
+            }
+
+            &:active {
+                background: #01579B;
+            }
+        }
+
+        &.cyan {
+            background: #00BCD4;
+            color: white;
+
+            &:hover {
+                background: #0097A7;
+            }
+
+            &:active {
+                background: #006064;
+            }
+        }
+
+        &.teal {
+            background: #009688;
+            color: white;
+
+            &:hover {
+                background: #00796B;
+            }
+
+            &:active {
+                background: #004D40;
+            }
+        }
+
+        &.light-green {
+            background: #8BC34A;
+            color: white;
+
+            &:hover {
+                background: #689F38;
+            }
+
+            &:active {
+                background: #33691E;
+            }
+        }
+
+        &.lime {
+            background: #CDDC39;
+            color: rgba(0, 0, 0, 0.87);
+
+            &:hover {
+                background: #AFB42B;
+            }
+
+            &:active {
+                background: #827717;
+                color: white;
+            }
+        }
+
+        &.yellow {
+            background: #FFEB3B;
+            color: rgba(0, 0, 0, 0.87);
+
+            &:hover {
+                background: #FBC02D;
+            }
+
+            &:active {
+                background: #F57F17;
+                color: white;
+            }
+        }
+
+        &.amber {
+            background: #FFC107;
+            color: rgba(0, 0, 0, 0.87);
+
+            &:hover {
+                background: #FFA000;
+            }
+
+            &:active {
+                background: #FF6F00;
+                color: white;
+            }
+        }
+
+        &.orange {
+            background: #FF9800;
+            color: rgba(0, 0, 0, 0.87);
+
+            &:hover {
+                background: #F57C00;
+            }
+
+            &:active {
+                background: #E65100;
+                color: white;
+            }
+        }
+
+        &.deep-orange {
+            background: #FF5722;
+            color: white;
+
+            &:hover {
+                background: #E64A19;
+            }
+
+            &:active {
+                background: #BF360C;
+            }
+        }
+
+        &.brown {
+            background: #795548;
+            color: white;
+
+            &:hover {
+                background: #5D4037;
+            }
+
+            &:active {
+                background: #3E2723;
+            }
+        }
+
+        &.grey {
+            background: #9E9E9E;
+            color: white;
+
+            &:hover {
+                background: #616161;
+            }
+
+            &:active {
+                background: #212121;
+            }
+        }
+
+        &.blue-grey {
+            background: #607D8B;
+            color: white;
+
+            &:hover {
+                background: #455A64;
+            }
+
+            &:active {
+                background: #263238;
+            }
+        }
+
+        &.active {
+            background: white;
+            color: #2a2a2a;
+
+            &:hover {
+                background: #e0e0e0;
+            }
+
+            &:active {
+                background: #c0c0c0;
+            }
+        }
+
+        &.disabled {
+            background: #383838;
+            color: #808080;
+            cursor: default;
+            pointer-events: none;
+
+            &:hover {
+                background: #383838;
+            }
+
+            &:active {
+                background: #383838;
+            }
+        }
+    }
+
+    .icon {
+        font-size: 16px;
+        text-align: center;
+    }
+}

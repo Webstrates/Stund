@@ -1,0 +1,406 @@
+import { resolveSchemaRefs } from '#SessionHistory .default';
+
+
+
+const AUTO_ACCEPT_EVAL = true;
+const MAX_EVAL_RESULT_LENGTH = 32000;
+
+const FILTERED_EVENT_TYPES = [
+    'processor.voicedetect',
+    'debug.*'
+];
+
+export class HistoryModelExpert {
+    getAllEvents() {
+        if (!window.sessionHistory?.model) {
+            throw new Error('Not connected to the session history.');
+        }
+
+        return window.sessionHistory?.model?.events.filter(e => !FILTERED_EVENT_TYPES.some(filter => (filter.endsWith('*') ? e.type.startsWith(filter.slice(0, -1)) : e.type === filter))) || [];
+    }
+
+    @Tool({
+        description: 'Converts epoch milliseconds to human-readable strings. Accepts an array of epoch values and returns a map keyed by epoch value.',
+        parameters: {
+            type: 'object',
+            properties: {
+                epochMillis: {
+                    type: 'array',
+                    items: { type: 'number' },
+                    description: 'The epoch time(s) in milliseconds to convert.'
+                }
+            },
+            required: ['epochMillis'],
+            additionalProperties: false
+        },
+        returns: { type: 'object' }
+    })
+    convertEpochToHumanReadable(epochMillis) {
+        if (!Array.isArray(epochMillis)) {
+            throw new Error('epochMillis must be an array of numbers.');
+        }
+
+        const humanReadableTimeMap = {};
+        for (const epoch of epochMillis) {
+            humanReadableTimeMap[String(epoch)] = `${new Date(epoch).toLocaleDateString('de')} ${new Date(epoch).toLocaleTimeString('de')}`;
+        }
+
+        return humanReadableTimeMap;
+    }
+
+    @Tool({
+        description: 'Retrieves a list of all unique event types present in the history model.',
+        returns: { type: 'array' }
+    })
+    getEventTypes() {
+        if (!window.sessionHistory?.session) {
+            throw new Error('Not connected to the session history.');
+        }
+
+        const typesSet = new Set();
+        for (const processor of Object.values(sessionHistory.session.schema.processors)) {
+            for (const eventType of Object.keys(processor.config.outputs || {})) {
+                if (!FILTERED_EVENT_TYPES.some(filter => (filter.endsWith('*') ? eventType.startsWith(filter.slice(0, -1)) : eventType === filter))) {
+                    typesSet.add(eventType);
+                }
+            }
+        }
+
+        return Array.from(typesSet);
+    }
+
+    @Tool({
+        description: 'Retrieves the general schema for events in the history model. It describes the common structure shared by all event types.',
+        returns: { type: 'object' }
+    })
+    getBaseEventSchema() {
+        if (!window.sessionHistory?.session) {
+            throw new Error('Not connected to the session history.');
+        }
+
+        return window.sessionHistory.session.getBaseEventSchema();
+    }
+
+    @Tool({
+        description: 'Retrieves schemas for the given event types from the history model. Returns an object keyed by event type where each value describes the structure of the event data object.',
+        parameters: {
+            type: 'object',
+            properties: {
+                types: {
+                    type: 'array',
+                    items: { type: 'string' },
+                    description: 'The event types to retrieve schemas for.'
+                }
+            },
+            required: ['types'],
+            additionalProperties: false
+        },
+        returns: { type: 'object' }
+    })
+    getEventTypeSchema(types) {
+        if (!window.sessionHistory?.session) {
+            throw new Error('Not connected to the session history.');
+        }
+
+        const requestedTypes = (Array.isArray(types) ? types : [types])
+            .filter(type => typeof type === 'string' && type.trim())
+            .map(type => type.trim());
+
+        if (requestedTypes.length === 0) {
+            throw new Error('types must be a non-empty array of event type strings.');
+        }
+
+        const requestedTypeSet = new Set(requestedTypes);
+        const result = {};
+
+        for (const [processorName, processor] of Object.entries(sessionHistory.session.schema.processors)) {
+            for (const eventType of Object.keys(processor.config.outputs || {})) {
+                if (requestedTypeSet.has(eventType)) {
+                    const schemaId = processor.config.outputs[eventType].schemaId;
+                    const schema = window.sessionHistory.session.getEventDataSchema(processorName, schemaId);
+                    const schemasMap = processor.config.schemas || {};
+                    result[eventType] = resolveSchemaRefs(schema, schemasMap);
+                }
+            }
+        }
+
+        const missingTypes = requestedTypes.filter(type => !result[type]);
+        if (missingTypes.length > 0) {
+            throw new Error(`Event type(s) not found in the history model: ${missingTypes.join(', ')}.`);
+        }
+
+        return result;
+    }
+
+    @Tool({
+        description: 'Calls the provided callback function and returns the results. The returned data from the callback must be JSON serializable.',
+        parameters: {
+            type: 'object',
+            properties: {
+                callback: {
+                    type: 'js',
+                    description: 'A javascript callback on the form (history) => { ... logic goes here...}. You cannot directly call other tools from within this JavaScript callback.'
+                }
+            },
+            required: ['callback'],
+            additionalProperties: false
+        },
+        returns: { type: 'object' }
+    })
+    evalHistory(callback) {
+        console.log('Executing evalHistory with callback:', callback.toString());
+        const confirm = AUTO_ACCEPT_EVAL || window.confirm('Are you sure you want to run this custom code on the history model? This may be unsafe.\n\n' + callback.toString());
+        if (!confirm) {
+            throw new Error('User cancelled the custom code execution.');
+        }
+
+        const result = callback(this.getAllEvents());
+
+        let serializedResult;
+        try {
+            serializedResult = JSON.stringify(result);
+        } catch (error) {
+            throw new Error(`Eval result must be JSON serializable: ${error.message}`);
+        }
+
+        if (serializedResult.length > MAX_EVAL_RESULT_LENGTH) {
+            return {
+                truncated: true,
+                originalLength: serializedResult.length,
+                maxLength: MAX_EVAL_RESULT_LENGTH,
+                result: serializedResult.slice(0, MAX_EVAL_RESULT_LENGTH)
+            };
+        }
+
+        return result;
+    }
+
+
+
+    getBaseContext() {
+        const currentTimeEpoch = Date.now();
+        const currentTimeHuman = this.convertEpochToHumanReadable([currentTimeEpoch])[String(currentTimeEpoch)];
+
+        return {
+            eventCount: this.getAllEvents().length,
+            eventTypes: this.getEventTypes(),
+            baseEventSchema: this.getBaseEventSchema(),
+            currentTimeEpoch,
+            currentTimeHuman
+        };
+    }
+
+    async ask(prompt, shapeContext = []) {
+        const baseContext = this.getBaseContext();
+
+        const reply = await this.historyModelSlop(
+            prompt,
+            shapeContext,
+
+            baseContext,
+
+            this.convertEpochToHumanReadable,
+            this.getEventTypeSchema,
+            this.evalHistory
+        );
+
+        return reply;
+    }
+
+    @Slop({
+        parameters: {
+            type: 'object',
+            properties: {
+                prompt: {
+                    type: 'string',
+                    description: 'The prompt of the user.'
+                },
+                shapeContext: {
+                    type: 'array',
+                    description: 'Optional shape context provided by the main agent for this prompt.',
+                    items: { type: 'shape' }
+                },
+                baseContext: {
+                    type: 'object',
+                    description: 'Base context for this expert call.',
+                    properties: {
+                        eventCount: {
+                            type: 'number',
+                            description: 'The total number of events in the history model.'
+                        },
+                        eventTypes: {
+                            type: 'array',
+                            items: { type: 'string' },
+                            description: 'A list of all event types present in the history model.'
+                        },
+                        baseEventSchema: {
+                            type: 'object',
+                            description: 'The general schema for events in the history model.'
+                        },
+                        currentTimeEpoch: {
+                            type: 'number',
+                            description: 'The current time as epoch milliseconds.'
+                        },
+                        currentTimeHuman: {
+                            type: 'string',
+                            description: 'The current time as a human-readable string.'
+                        }
+                    },
+                    required: ['eventCount', 'eventTypes', 'baseEventSchema', 'currentTimeEpoch', 'currentTimeHuman']
+                }
+            },
+            required: ['prompt', 'shapeContext', 'baseContext']
+        },
+        returns: {
+            type: 'object',
+            properties: {
+                content: {
+                    type: 'string',
+                    description: 'User-facing plain text answer.'
+                },
+                shapeContext: {
+                    type: 'array',
+                    description: 'Optional array of relevant shapes for machine use by the main agent/chat UI.',
+                    items: { type: 'shape' }
+                }
+            },
+            required: ['content'],
+            additionalProperties: false
+        }
+    })
+    historyModelSlop(prompt, shapeContext, baseContext) {
+        `You are an expert on the history model of a meeting recording application.
+
+
+# Your Role
+
+You analyze meeting event data to answer questions about what happened during a meeting, including timing, participants, transcripts, and interactions.
+
+
+## Input
+
+### prompt
+
+You receive a "prompt" string which is the user's request or question. Your primary goal is to fulfill the user's request as accurately as possible.
+
+### shapeContext (optional)
+
+You may also receive a "shapeContext" argument with one or more canvas shapes relevant to the latest prompt. When shapeContext is present:
+- Treat it as high-priority context for interpreting references like "this shape" or "that note"
+- Use shape IDs, types, positions, and properties to filter and interpret relevant events
+- Return overlapping shapes in your response shapeContext when relevant
+
+### baseContext
+
+You receive base history context in baseContext:
+- baseContext.eventCount
+- baseContext.eventTypes
+- baseContext.baseEventSchema
+- baseContext.currentTimeEpoch
+- baseContext.currentTimeHuman
+
+
+## Output
+
+### content
+
+- Plain text response for the user
+- Always set content to plain text only with no markdown, code blocks, or special formatting
+- Convert all epoch timestamps to human-readable format before presenting them
+- Never expose internal IDs in content unless explicitly requested
+- Be concise but thorough
+
+### shapeContext (optional)
+
+- Include shapes relevant to the final answer, especially when linking history events to canvas items
+- Include at least each shape's id and type, and include x, y, rotation, opacity, and props when available
+- Keep IDs out of content unless the user explicitly asks for IDs
+- shapeContext is machine-readable metadata and may include IDs for UI highlighting and routing
+
+
+## Error Handling
+
+- If no events match the query, explain that no relevant data was found
+- If an event type schema is unavailable, inform the user and try alternatives
+- If timestamps are missing or malformed, handle gracefully and note the limitation
+
+
+## Tools
+
+### convertEpochToHumanReadable
+
+Use when you need to present timestamps to the user. Always convert epoch timestamps before including them in your response. It returns an object map keyed by epoch value.
+
+### getEventTypeSchema
+
+Use before querying event data. Call this first to understand the structure of the event types you want to query. It accepts an array of types and returns a map keyed by event type.
+
+### evalHistory
+
+Use for:
+- Filtering events by type, time range, or properties
+- Aggregating data (counts, sums, durations)
+- Finding specific content in transcripts
+- Calculating meeting statistics
+
+Common patterns:
+- Filter by type: history.filter(e => e.type === 'transcript')
+- Filter by time range: history.filter(e => e.timestamp >= start && e.timestamp <= end)
+- Get latest N events: history.slice(-N)
+- Group by property: use reduce to aggregate data
+- Find unique speakers: [...new Set(history.filter(e => e.type === 'transcript').map(e => e.speaker))]
+- Calculate durations: events.reduce((sum, e) => sum + (e.endTime - e.startTime), 0)
+
+
+# Analysis Guidelines
+
+- When asked about "recent" events, consider the last 5-10 minutes unless the user specifies another range
+- If a question is ambiguous, make reasonable assumptions and state them
+- For speaker names, use case-insensitive partial matching
+- When counting or aggregating, handle undefined/null values gracefully
+
+
+# Examples
+
+## Example 1: "What did John say about the budget?"
+
+Thinking: User wants transcript content from a specific speaker about a topic.
+Action: Call getEventTypeSchema for ['transcript'] to understand the structure.
+Reply (getEventTypeSchema): Schema with speaker, text, timestamp fields.
+Action: Call evalHistory to filter transcripts by speaker and keyword.
+Reply (evalHistory): List of matching transcript events.
+Action: Call convertEpochToHumanReadable for the timestamps.
+Reply (convertEpochToHumanReadable): Object map keyed by epoch value.
+Response: "John mentioned the budget at 14:32: 'We need to review the Q4 budget before Friday'."
+
+
+## Example 2: "How long has the meeting been going?"
+
+Thinking: User wants meeting duration from start until now.
+Action: Call evalHistory to find the earliest event timestamp.
+Reply (evalHistory): First event with timestamp.
+Action: Call convertEpochToHumanReadable for the start time.
+Reply (convertEpochToHumanReadable): Object map keyed by epoch value.
+Response: "The meeting started at 14:00 and has been going for 45 minutes."
+
+
+## Example 3: "Who has spoken the most?"
+
+Thinking: User wants speaker statistics.
+Action: Call getEventTypeSchema for ['transcript'] to understand speaker field.
+Reply (getEventTypeSchema): Schema with speaker field.
+Action: Call evalHistory to group transcripts by speaker and count.
+Reply (evalHistory): Speaker counts sorted by frequency.
+Response: "Sarah has spoken the most with 23 contributions, followed by John with 18."
+
+
+## Example 4: "Summarize the last 5 minutes"
+
+Thinking: User wants recent activity summary.
+Action: Call evalHistory to filter events from the last 5 minutes.
+Reply (evalHistory): List of recent events grouped by type.
+Action: Call convertEpochToHumanReadable for relevant timestamps.
+Reply (convertEpochToHumanReadable): Object map keyed by epoch value.
+Response: "In the last 5 minutes: Sarah discussed the project timeline, John added 2 notes to the canvas, and the team agreed on next steps."`
+    }
+}

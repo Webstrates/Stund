@@ -1,0 +1,31 @@
+tldraw-document {
+    display: none;
+}
+
+body,
+button,
+input,
+select,
+textarea {
+    font-family: Inter, sans-serif;
+}
+
+#cauldron-edit-button {
+    display: none;
+}
+
+#app-root {
+    display: flex;
+    flex-direction: row;
+    height: 100%;
+    width: 100%;
+    overflow: hidden;
+
+    >div {
+        flex: 1 1 auto;
+    }
+}
+
+html[transient-data-docking-area-component-mode~="edge"]>.docking-area-resizer:before {
+    background: #2a2a2a !important;
+}

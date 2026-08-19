@@ -1,0 +1,12 @@
+{
+    "description": "The main app package.",
+    "dependencies": [
+        "#ImportMapping",
+        "codestrates-repos editor_core",
+        "codestrates-repos editor_preview",
+        "codestrates-repos fragment_js_babel",
+        "codestrates-repos fragment_markdown"
+    ],
+    "assets": [],
+    "version": "0.1.0"
+}

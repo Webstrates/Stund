@@ -1,0 +1,44 @@
+{
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "description": "Schema for shape moved event. This is a duration event that tracks shape position changes, batching rapid movements into a single event that ends after 1500ms of inactivity.",
+    "type": "object",
+    "properties": {
+        "shapeId": {
+            "type": "string",
+            "description": "The unique identifier of the shape that was moved"
+        },
+        "shapeType": {
+            "type": "string",
+            "description": "The type of the shape (e.g., 'note', 'text', 'geo', 'draw')"
+        },
+        "xStart": {
+            "type": "number",
+            "description": "The x-coordinate position of the shape at the start of the move"
+        },
+        "yStart": {
+            "type": "number",
+            "description": "The y-coordinate position of the shape at the start of the move"
+        },
+        "xEnd": {
+            "type": "number",
+            "description": "The x-coordinate position of the shape at the end of the move"
+        },
+        "yEnd": {
+            "type": "number",
+            "description": "The y-coordinate position of the shape at the end of the move"
+        },
+        "reason": {
+            "type": "string",
+            "description": "Optional reason for ending the move event (e.g., 'deleted', 'cleanup')"
+        }
+    },
+    "required": [
+        "shapeId",
+        "shapeType",
+        "xStart",
+        "yStart",
+        "xEnd",
+        "yEnd"
+    ],
+    "additionalProperties": false
+}

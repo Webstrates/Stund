@@ -1,0 +1,777 @@
+import { cleanShapesData } from '#MeetingRecorder .recorder-helpers';
+import { getModel } from '#ModelManager .default';
+import { generateImageAsset } from '#AIHelpers .default';
+import { convertAndValidateShapes } from '#CanvasHelpers .default';
+import {
+    createDocumentFragment as createDocumentFragmentHelper,
+    getDocumentFragmentTextByFragmentId as getDocumentFragmentTextByFragmentIdHelper,
+    getDocumentFragmentNameByFragmentId as getDocumentFragmentNameByFragmentIdHelper,
+    setDocumentFragmentTextByFragmentId as setDocumentFragmentTextByFragmentIdHelper,
+    setDocumentFragmentNameByFragmentId as setDocumentFragmentNameByFragmentIdHelper
+} from '#Document .helpers';
+
+
+
+const AUTO_ACCEPT_EVAL = true;
+const MAX_EVAL_RESULT_LENGTH = 32000;
+
+export class CanvasExpert {
+    getAllShapes() {
+        const allShapes = window.tldrawEditor.getCurrentPageShapes() || [];
+        return cleanShapesData(allShapes);
+    }
+
+    @Tool({
+        description: 'Retrieves a list of all shape types supported by the tldraw canvas.',
+        returns: { type: 'array' }
+    })
+    getShapeTypes() {
+        // Use a limited set of shapes to keep it simple
+        return ['text', 'draw', 'geo', 'note', 'arrow', 'image', 'line', 'ScreenStream', 'VideoStream', 'Widget', 'Document'];
+        // return Object.keys(window.tldrawEditor.shapeUtils);
+    }
+
+    @Tool({
+        description: 'Retrieves the schema for shapes in the tldraw canvas.',
+        returns: { type: 'object' }
+    })
+    getShapeSchema() {
+        const fragment = Fragment.one(`code-fragment[name="shape"]`);
+        if (!fragment) {
+            throw new Error(`No schema found for shape.`);
+        }
+        return JSON.parse(fragment.raw);
+    }
+
+    @Tool({
+        description: 'Selects the given shapes in the tldraw canvas.',
+        parameters: {
+            type: 'object',
+            properties: {
+                shapeIds: {
+                    type: 'array',
+                    items: { type: 'string' },
+                    description: 'A list of shape IDs to select in the tldraw canvas.'
+                }
+            },
+            required: ['shapeIds'],
+            additionalProperties: false
+        },
+        returns: { type: 'object' }
+    })
+    selectShapes(shapeIds) {
+        try {
+            window.tldrawEditor.setSelectedShapes(shapeIds);
+            return {
+                message: 'Shapes selected successfully',
+                selectedShapeIds: shapeIds
+            };
+        } catch (error) {
+            throw new Error(`Failed to select shapes: ${error.message}`);
+        }
+    }
+
+    @Tool({
+        description: 'Retrieves shapes by their IDs from the tldraw canvas and returns a map keyed by shape id.',
+        parameters: {
+            type: 'object',
+            properties: {
+                shapeIds: {
+                    type: 'array',
+                    items: { type: 'string' },
+                    description: 'A list of shape IDs to retrieve from the tldraw canvas.'
+                }
+            },
+            required: ['shapeIds'],
+            additionalProperties: false
+        },
+        returns: { type: 'object' }
+    })
+    getShapesById(shapeIds) {
+        const shapes = [];
+        for (const shapeId of shapeIds) {
+            const shape = window.tldrawEditor.store.get(shapeId);
+            if (shape) {
+                shapes.push(shape);
+            }
+        }
+        const cleanedShapes = cleanShapesData(shapes);
+        const shapeMap = {};
+        for (const shape of cleanedShapes) {
+            shapeMap[shape.id] = shape;
+        }
+
+        return shapeMap;
+    }
+
+    @Tool({
+        description: 'Calls the provided callback function with all shapes and returns the results. The returned data from the callback must be JSON serializable.',
+        parameters: {
+            type: 'object',
+            properties: {
+                callback: {
+                    type: 'js',
+                    description: 'A javascript callback on the form (shapes) => { ... logic goes here...}. You cannot directly call other tools from within this JavaScript callback.'
+                }
+            },
+            required: ['callback'],
+            additionalProperties: false
+        },
+        returns: { type: 'object' }
+    })
+    evalShapes(callback) {
+        console.log('Executing evalShapes with callback:', callback.toString());
+        const confirm = AUTO_ACCEPT_EVAL || window.confirm('Are you sure you want to run this custom code on the canvas shapes? This may be unsafe.\n\n' + callback.toString());
+        if (!confirm) {
+            throw new Error('User cancelled the custom code execution.');
+        }
+
+        const result = callback(this.getAllShapes());
+
+        let serializedResult;
+        try {
+            serializedResult = JSON.stringify(result);
+        } catch (error) {
+            throw new Error(`Eval result must be JSON serializable: ${error.message}`);
+        }
+
+        if (serializedResult.length > MAX_EVAL_RESULT_LENGTH) {
+            return {
+                truncated: true,
+                originalLength: serializedResult.length,
+                maxLength: MAX_EVAL_RESULT_LENGTH,
+                result: serializedResult.slice(0, MAX_EVAL_RESULT_LENGTH)
+            };
+        }
+
+        return result;
+    }
+
+
+
+    @Tool({
+        description: 'Creates a document fragment that can be linked from a Document shape and returns the fragment ID.',
+        parameters: {
+            type: 'object',
+            properties: {
+                name: {
+                    type: 'string',
+                    description: 'Optional document name. Defaults to "New Document".'
+                },
+                textContent: {
+                    type: 'string',
+                    description: 'Optional markdown content for the fragment.'
+                }
+            },
+            required: [],
+            additionalProperties: false
+        },
+        returns: { type: 'string' }
+    })
+    createDocumentFragment(name, textContent) {
+        const fragmentId = createDocumentFragmentHelper(name, textContent);
+        return fragmentId;
+    }
+
+    @Tool({
+        description: 'Retrieves markdown text content by document fragment ID.',
+        parameters: {
+            type: 'object',
+            properties: {
+                fragmentId: {
+                    type: 'string',
+                    description: 'The document fragment ID.'
+                }
+            },
+            required: ['fragmentId'],
+            additionalProperties: false
+        },
+        returns: { type: 'string' }
+    })
+    getDocumentFragmentTextByFragmentId(fragmentId) {
+        const textContent = getDocumentFragmentTextByFragmentIdHelper(fragmentId);
+        if (textContent === null) {
+            throw new Error(`No document fragment found with ID ${fragmentId}.`);
+        }
+
+        return textContent;
+    }
+
+    @Tool({
+        description: 'Retrieves the document name by document fragment ID.',
+        parameters: {
+            type: 'object',
+            properties: {
+                fragmentId: {
+                    type: 'string',
+                    description: 'The document fragment ID.'
+                }
+            },
+            required: ['fragmentId'],
+            additionalProperties: false
+        },
+        returns: { type: 'string' }
+    })
+    getDocumentFragmentNameByFragmentId(fragmentId) {
+        const name = getDocumentFragmentNameByFragmentIdHelper(fragmentId);
+        if (name === null) {
+            throw new Error(`No document fragment found with ID ${fragmentId}.`);
+        }
+
+        return name;
+    }
+
+    @Tool({
+        description: 'Updates markdown text content by document fragment ID.',
+        parameters: {
+            type: 'object',
+            properties: {
+                fragmentId: {
+                    type: 'string',
+                    description: 'The document fragment ID.'
+                },
+                textContent: {
+                    type: 'string',
+                    description: 'The new markdown text content.'
+                }
+            },
+            required: ['fragmentId', 'textContent'],
+            additionalProperties: false
+        },
+        returns: { type: 'string' }
+    })
+    setDocumentFragmentTextByFragmentId(fragmentId, textContent) {
+        const updated = setDocumentFragmentTextByFragmentIdHelper(fragmentId, textContent);
+        if (!updated) {
+            throw new Error(`No document fragment found with ID ${fragmentId}.`);
+        }
+
+        return `Document fragment text updated successfully for fragment ID ${fragmentId}`;
+    }
+
+    @Tool({
+        description: 'Updates the document name by document fragment ID.',
+        parameters: {
+            type: 'object',
+            properties: {
+                fragmentId: {
+                    type: 'string',
+                    description: 'The document fragment ID.'
+                },
+                name: {
+                    type: 'string',
+                    description: 'The new document name.'
+                }
+            },
+            required: ['fragmentId', 'name'],
+            additionalProperties: false
+        },
+        returns: { type: 'string' }
+    })
+    setDocumentFragmentNameByFragmentId(fragmentId, name) {
+        const updated = setDocumentFragmentNameByFragmentIdHelper(fragmentId, name);
+        if (!updated) {
+            throw new Error(`No document fragment found with ID ${fragmentId}.`);
+        }
+
+        return `Document fragment name updated successfully for fragment ID ${fragmentId}`;
+    }
+
+
+
+    @Tool({
+        description: 'Creates the given shapes in the tldraw canvas. Each shape must have x, y, and type properties. Do not provide an id, it will be generated automatically. Only provide the props that you really need to set.',
+        parameters: {
+            type: 'object',
+            properties: {
+                shapes: {
+                    type: 'array',
+                    items: { type: 'object' },
+                    description: 'A list of shapes to create in the tldraw canvas.'
+                }
+            },
+            required: ['shapes'],
+            additionalProperties: false
+        },
+        returns: { type: 'object' }
+    })
+    createShapes(shapes) {
+        try {
+            console.log('Creating shapes:', shapes);
+            const { validatedShapes, errors } = convertAndValidateShapes(shapes);
+
+            if (errors.length > 0) {
+                throw new Error(errors.join('; '));
+            } else {
+                window.tldrawEditor.createShapes(validatedShapes);
+                return {
+                    message: 'Shapes created successfully',
+                    createdShapeIds: validatedShapes
+                };
+            }
+        } catch (error) {
+            throw new Error(`Failed to create shapes: ${error.message}`);
+        }
+    }
+
+    @Tool({
+        description: `Updates the given shapes in the tldraw canvas. Only updated values need to be provided. The ID is always required.`,
+        parameters: {
+            type: 'object',
+            properties: {
+                shapes: {
+                    type: 'array',
+                    items: { type: 'object' },
+                    description: 'A list of shapes to update in the tldraw canvas.'
+                }
+            },
+            required: ['shapes'],
+            additionalProperties: false
+        },
+        returns: { type: 'object' }
+    })
+    updateShapes(shapes) {
+        try {
+            const { validatedShapes, errors } = convertAndValidateShapes(shapes);
+
+            if (errors.length > 0) {
+                throw new Error(errors.join('; '));
+            } else {
+                window.tldrawEditor.updateShapes(validatedShapes);
+                return {
+                    message: 'Shapes updated successfully',
+                    updatedShapeIds: validatedShapes
+                };
+            }
+        } catch (error) {
+            throw new Error(`Failed to update layout: ${error.message}`);
+        }
+    }
+
+    @Tool({
+        description: 'Deletes the given shapes from the tldraw canvas.',
+        parameters: {
+            type: 'object',
+            properties: {
+                shapeIds: {
+                    type: 'array',
+                    items: { type: 'string' },
+                    description: 'A list of shape IDs to delete from the tldraw canvas.'
+                }
+            },
+            required: ['shapeIds'],
+            additionalProperties: false
+        },
+        returns: { type: 'object' }
+    })
+    deleteShapes(shapeIds) {
+        try {
+            window.tldrawEditor.deleteShapes(shapeIds);
+            return {
+                message: 'Shapes deleted successfully',
+                deletedShapeIds: shapeIds
+            }
+        } catch (error) {
+            throw new Error(`Failed to delete shapes: ${error.message}`);
+        }
+    }
+
+
+
+    @Tool({
+        description: 'Retrieves a list of all available widgets from the widget repository that can be added to the tldraw canvas.',
+        returns: {
+            type: 'array',
+            description: 'A list of available widgets with their name, description, and source fragment ID.'
+        }
+    })
+    getAvailableWidgetsFromWidgetRepository() {
+        return Array.from(document.querySelectorAll('#widget-fragments code-fragment')).map(e => {
+            return {
+                name: e.getAttribute('name'),
+                description: e.getAttribute('description') || '',
+                sourceFragmentId: e.id
+            };
+        });
+    }
+
+    @Tool({
+        description: 'Generates an image based on the given text prompt and creates an image shape on the canvas.',
+        parameters: {
+            type: 'object',
+            properties: {
+                prompt: {
+                    type: 'string',
+                    description: 'The text prompt to generate an image from.'
+                },
+                shape: {
+                    type: 'object',
+                    description: 'The shape object where the generated image will be used.'
+                },
+                options: {
+                    type: 'object',
+                    description: 'Optional image generation options.',
+                    properties: {
+                        width: {
+                            type: 'number',
+                            description: 'Width of the generated image in pixels. Default is 1024.'
+                        },
+                        height: {
+                            type: 'number',
+                            description: 'Height of the generated image in pixels. Default is 1024.'
+                        },
+                        // model: {
+                        //     type: 'string',
+                        //     description: 'The model to use for image generation.'
+                        // }
+                    }
+                }
+            },
+            required: ['prompt', 'shape'],
+            additionalProperties: false
+        },
+        returns: { type: 'object' }
+    })
+    async createGeneratedImageShape(prompt, shape, options = {}) {
+        const model = getModel('canvas-expert-image-generation');
+        const { assetId } = await generateImageAsset(prompt, model, options.width, options.height);
+
+        if (!shape.props) {
+            shape.props = {};
+        }
+        shape.props.assetId = assetId;
+
+        return this.createShapes([shape]);
+    }
+
+
+
+    getBaseContext(writeAccess = false) {
+        const shapeTypes = this.getShapeTypes();
+        const shapeDefaultProps = Object.entries(window.tldrawEditor.shapeUtils)
+            .filter(([key]) => shapeTypes.includes(key))
+            .map(entry => ({ [entry[0]]: entry[1].getDefaultProps() }));
+
+        return {
+            writeAccess: Boolean(writeAccess),
+            shapeCount: this.getAllShapes().length,
+            shapeTypes,
+            shapeSchema: this.getShapeSchema(),
+            shapeDefaultProps,
+            pageBounds: window.tldrawEditor.getViewportPageBounds()
+        };
+    }
+
+    async ask(prompt, shapeContext = [], writeAccess = false) {
+        const baseContext = this.getBaseContext(writeAccess);
+
+        const enabledTools = [
+            this.selectShapes,
+            this.getShapesById,
+            this.evalShapes,
+
+            this.getAvailableWidgetsFromWidgetRepository,
+
+            this.getDocumentFragmentTextByFragmentId,
+            this.getDocumentFragmentNameByFragmentId
+        ];
+
+        if (baseContext.writeAccess) {
+            enabledTools.push(
+                this.createShapes,
+                this.updateShapes,
+                this.deleteShapes,
+
+                this.createGeneratedImageShape,
+
+                this.createDocumentFragment,
+                this.setDocumentFragmentTextByFragmentId,
+                this.setDocumentFragmentNameByFragmentId
+            );
+        }
+
+        const reply = await this.canvasSlop(
+            prompt,
+            shapeContext,
+            baseContext,
+
+            ...enabledTools
+        );
+
+        return reply;
+    }
+
+    @Slop({
+        parameters: {
+            type: 'object',
+            properties: {
+                prompt: {
+                    type: 'string',
+                    description: 'The prompt of the user.'
+                },
+                shapeContext: {
+                    type: 'array',
+                    description: 'Optional shape context provided by the main agent for this prompt.',
+                    items: { type: 'shape' }
+                },
+                baseContext: {
+                    type: 'object',
+                    description: 'Base context for this expert call.',
+                    properties: {
+                        writeAccess: {
+                            type: 'boolean',
+                            description: 'Whether write access is enabled for the canvas expert.'
+                        },
+                        shapeCount: {
+                            type: 'number',
+                            description: 'The total number of shapes in the tldraw canvas.'
+                        },
+                        shapeTypes: {
+                            type: 'array',
+                            items: { type: 'string' },
+                            description: 'A list of all shape types supported by the tldraw canvas.'
+                        },
+                        shapeSchema: {
+                            type: 'object',
+                            description: 'The schema definition for shapes in the tldraw canvas.'
+                        },
+                        shapeDefaultProps: {
+                            type: 'array',
+                            items: { type: 'object' },
+                            description: 'A list of default properties for each shape type in the tldraw canvas.'
+                        },
+                        pageBounds: {
+                            type: 'object',
+                            description: 'The current page bounds of the tldraw canvas.'
+                        }
+                    },
+                    required: ['writeAccess', 'shapeCount', 'shapeTypes', 'shapeSchema', 'shapeDefaultProps', 'pageBounds']
+                }
+            },
+            required: ['prompt', 'shapeContext', 'baseContext']
+        },
+        returns: {
+            type: 'object',
+            properties: {
+                content: {
+                    type: 'string',
+                    description: 'User-facing plain text answer.'
+                },
+                shapeContext: {
+                    type: 'array',
+                    description: 'Optional array of relevant shapes for machine use by the main agent/chat UI.',
+                    items: { type: 'shape' }
+                }
+            },
+            required: ['content'],
+            additionalProperties: false
+        }
+    })
+    canvasSlop(prompt, shapeContext, baseContext) {
+        `You are an expert on the canvas of a collaborative meeting application. The canvas uses the tldraw SDK.
+
+
+# Your Role
+
+You help users understand and interact with canvas content. You can describe shapes, analyze layouts, and provide information about canvas state. If write access is enabled, you can also create, update, and delete shapes.
+
+
+## Input
+
+### prompt
+
+You receive a "prompt" string which is the user's request or question. Your primary goal is to fulfill the user's request as accurately as possible.
+
+### shapeContext (optional)
+
+You may also receive a "shapeContext" argument with one or more shapes selected or identified by other agents. When shapeContext is present:
+- Treat it as high-priority context for interpreting references like "this" or "these shapes"
+- Use it to focus tool calls before scanning broader canvas data
+- Return overlapping or updated shapes in your response shapeContext when relevant
+
+### baseContext
+
+You receive canvas context in baseContext:
+- baseContext.writeAccess
+- baseContext.shapeCount
+- baseContext.shapeTypes
+- baseContext.shapeSchema
+- baseContext.shapeDefaultProps
+- baseContext.pageBounds
+
+
+## Output
+
+### content
+
+- Plain text response for the user
+- Always set content to plain text only with no markdown, code blocks, or special formatting
+- Never expose shape IDs in content unless the user explicitly asks
+- Use spatial language such as "top-left", "next to", or "below" where useful
+
+### shapeContext (optional)
+
+- Include shapeContext whenever your answer identifies, finds, compares, selects, creates, updates, or deletes specific shapes
+- Include at least each shape's id and type
+- Include x, y, rotation, opacity, and props when available
+- For deleted shapes where full data is unavailable, include minimal objects with id and type when possible
+- shapeContext is machine-readable metadata and may include IDs for routing and UI highlighting
+
+
+## Error Handling
+
+- If the shapeContext is empty but the user says "these", ask for clarification
+- If write access is not enabled but the user requests changes, explain that write access is not enabled
+- Remember that y increases downward
+- For text shapes, write text through props.text and read rich text from props.richText
+- For Document shapes, use document fragment tools to read/write markdown content and do not expect document text in props.text
+
+
+## Tools
+
+### selectShapes (read access)
+
+Use when the user wants to select specific shapes on the canvas by ID.
+
+### getShapesById (read access)
+
+Use when you need to retrieve specific shapes by known IDs. It returns an object map keyed by shape id.
+
+### evalShapes (read access)
+
+Use for:
+- Querying/filtering shapes by type, color, position, or text content
+- Calculations and aggregations across shapes
+- Always filter first; do not request all shapes when a narrower query is possible
+
+### getDocumentFragmentTextByFragmentId (read access)
+
+Use when:
+- You need markdown content from a Document fragment
+- The user asks what a document contains
+
+### getDocumentFragmentNameByFragmentId (read access)
+
+Use when:
+- You need to read the current name/title of a document
+- The user asks what a document is called
+
+### createShapes (write access)
+
+Use when the user wants to add new shapes to the canvas.
+
+### updateShapes (write access)
+
+Use when the user wants to modify existing shapes (move, resize, recolor, edit text).
+
+### deleteShapes (write access)
+
+Use when the user wants to remove shapes from the canvas.
+
+### createGeneratedImageShape (write access)
+
+Use when the user wants to generate an image from a text prompt and place it on the canvas.
+
+### createDocumentFragment (write access)
+
+Use when the user asks to create a new document fragment or when you need a new fragment id for a new Document shape.
+
+### setDocumentFragmentTextByFragmentId (write access)
+
+Use when:
+- The user asks to change document markdown text
+- You need to write content into an existing document fragment
+
+### setDocumentFragmentNameByFragmentId (write access)
+
+Use when:
+- The user asks to rename a document
+- You need to update the title/name of an existing document fragment
+
+
+
+# Shape Properties Reference
+
+- Available colors: black, blue, green, grey, light-blue, light-green, light-red, light-violet, orange, red, violet, white, yellow
+  - Note that "black" notes appear yellow on the canvas
+- Note dimensions: 190x190 pixels (you cannot change this)
+- Position: x, y coordinates with top-left origin
+- Text in shapes: set text with props.text; read TipTap rich text from props.richText
+- Document shapes store markdown in linked fragments (props.sourceFragmentId), not in props.text
+
+Custom shape types:
+- Widget: interactive widget shape (internal widget code is handled by another expert)
+- Document: markdown document shape linked to a document fragment via props.sourceFragmentId
+- VideoStream: participant webcam stream
+- ScreenStream: participant live screen sharing stream
+
+
+# Write Operation Guidelines
+
+- Creating shapes: place new shapes within the visible viewport and do not set IDs
+- Positioning: use viewport center as default location
+- Layout: maintain 20-30px spacing between nearby shapes
+- Longer text elements: use a "Document" shape with linked fragment for longer text instead of a cramped "Note"
+- For Document shape content edits, use setDocumentFragmentTextByFragmentId
+- For Document shape renaming, use setDocumentFragmentNameByFragmentId
+- Updates: only modify fields that must change
+- Avoid overlap and verify spatial sense before executing
+- Always adhere to the shape schema or writes will be rejected
+
+
+# Examples
+
+## Example 1: "What notes are on the canvas?"
+
+Thinking: User wants note-type shapes and their content.
+Action: Call evalShapes to retrieve note shapes and their text/color.
+Reply (evalShapes): List of matching notes.
+Response: "There are 3 notes on the canvas: a yellow note in the top-left saying 'Action items', a blue note in the center with 'Follow up with team', and a green note on the right labeled 'Done'."
+
+
+## Example 2: "Move the selected shapes to the right"
+
+Thinking: User wants repositioning and write access is required.
+Action: Use shapeContext, then call updateShapes with x shifted by +200.
+Reply (updateShapes): Confirmation of update.
+Response: "Moved the selected shapes 200 pixels to the right."
+
+
+## Example 3: "Create a sticky note with today's action items"
+
+Thinking: This is longer text, so create a geo rectangle instead of a note.
+Action: Compute center from baseContext.pageBounds.
+Action: Call createShapes with type 'geo', rectangle settings, and text content.
+Reply (createShapes): Confirmation of creation.
+Response: "Added the action items on the canvas as a resizable text card."
+
+
+## Example 4: "Organize the notes in a grid"
+
+Thinking: User wants layout restructuring.
+Action: Call evalShapes to get note positions.
+Reply (evalShapes): List of note shapes.
+Action: Compute grid positions and call updateShapes.
+Reply (updateShapes): Confirmation of update.
+Response: "Organized 6 notes into a 3x2 grid layout."
+
+
+## Example 5: "Delete all the red shapes"
+
+Thinking: User wants deletion by color filter.
+Action: Call evalShapes to find red shapes.
+Reply (evalShapes): List of red shapes.
+Action: Call deleteShapes with filtered IDs.
+Reply (deleteShapes): Confirmation of deletion.
+Response: "Deleted 2 red shapes: a rectangle and a note saying 'Urgent'."
+
+
+## Example 6: "Generate an image of a sunset over mountains and place it on the canvas"
+
+Thinking: User wants image generation + placement.
+Action: Compute center from baseContext.pageBounds.
+Action: Call createGeneratedImageShape with prompt and image shape placement fields.
+Reply (createGeneratedImageShape): Confirmation of creation.
+Response: "Generated an image of a sunset over mountains and placed it in the center of the canvas."`
+    }
+}

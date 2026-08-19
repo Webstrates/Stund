@@ -1,0 +1,84 @@
+.stund-info-dialog {
+    .stund-info-markdown {
+        h2,
+        h3,
+        h4,
+        p {
+            margin: 0 0 8px 0;
+        }
+
+        .stund-info-markdown-list {
+            margin: 0 0 12px 18px;
+            padding: 0;
+        }
+    }
+
+    .stund-info-transfer-layout {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+    }
+
+    .stund-info-file-actions {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+    }
+
+    .stund-info-transfer-divider {
+        width: 100%;
+        margin: 0;
+        border: none;
+        border-top: 1px solid #cfd8dc;
+    }
+
+    .stund-info-url-import-row {
+        display: flex;
+        gap: 8px;
+        align-items: center;
+        flex-wrap: wrap;
+    }
+
+    .stund-info-url-input-container {
+        flex: 1 1 320px;
+        min-width: 0;
+    }
+
+    .stund-info-url-input {
+        width: 100%;
+        min-width: 0;
+        height: 32px;
+        min-height: 32px;
+        box-sizing: border-box;
+        padding: 6px 12px;
+        border-radius: 4px;
+    }
+
+    .stund-info-transfer-status {
+        border: 1px solid #2e7d32;
+        border-radius: 6px;
+        padding: 8px;
+        background: #e8f5e9;
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+    }
+
+    .stund-info-transfer-status.error {
+        border-color: #d32f2f;
+        background: #ffebee;
+    }
+
+    .stund-info-transfer-status.success {
+        border-color: #2e7d32;
+        background: #e8f5e9;
+    }
+
+    .stund-info-transfer-status-detail {
+        line-height: 1.4;
+    }
+
+    .stund-info-hidden-file-input {
+        display: none;
+    }
+}

@@ -1,0 +1,9 @@
+{
+    "description": "Core runtime package that bootstraps the app shell and shared initialization flow.",
+    "dependencies": [
+        "#ImportMapping",
+        "codestrates-repos fragment_js_babel"
+    ],
+    "assets": [],
+    "version": "0.1.0"
+}

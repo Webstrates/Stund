@@ -1,0 +1,15 @@
+{
+    "description": "Agent configuration and integration utilities.",
+    "dependencies": [
+        "#AIHelpers",
+        "#CanvasHelpers",
+        "#CoreHelpers",
+        "#Document",
+        "#MeetingRecorder",
+        "#ModelManager",
+        "#SessionHistory",
+        "#SlopScript"
+    ],
+    "assets": [],
+    "version": "0.1.0"
+}

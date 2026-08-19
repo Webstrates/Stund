@@ -1,0 +1,6 @@
+{
+    "entryFragmentSelector": "#App .default",
+    "reloadFragmentSelectors": [
+        "#code [name=\"Core\"] [data-type=\"text/javascript+babel\"]"
+    ]
+}

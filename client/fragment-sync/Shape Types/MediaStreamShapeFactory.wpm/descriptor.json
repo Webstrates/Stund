@@ -1,0 +1,8 @@
+{
+    "description": "Shared tldraw shape factory and styles for media streams.",
+    "dependencies": [
+        "#CoreHelpers"
+    ],
+    "assets": [],
+    "version": "0.1.0"
+}

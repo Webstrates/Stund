@@ -1,0 +1,14 @@
+body {
+    margin: 0;
+    height: 100vh;
+    overflow: hidden !important;
+
+}
+
+#app-root {
+    display: flex;
+    flex-direction: row;
+    height: 100%;
+    width: 100%;
+    overflow: hidden;
+}

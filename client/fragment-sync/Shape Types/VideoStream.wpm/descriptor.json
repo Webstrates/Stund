@@ -1,0 +1,9 @@
+{
+    "description": "Stream component for video streams.",
+    "dependencies": [
+        "#MediaStreamShapeFactory",
+        "#VideoStreamManager"
+    ],
+    "assets": [],
+    "version": "0.1.0"
+}

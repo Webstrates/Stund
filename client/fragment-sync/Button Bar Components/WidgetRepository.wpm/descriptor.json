@@ -1,0 +1,9 @@
+{
+    "description": "Widget Repository for managing and sharing widgets",
+    "dependencies": [
+        "#App",
+        "#FragmentRepository"
+    ],
+    "assets": [],
+    "version": "0.1.0"
+}

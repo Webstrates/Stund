@@ -1,0 +1,666 @@
+import { CanvasExpert } from '#canvas-expert-slop';
+import { HistoryModelExpert } from '#history-model-expert-slop';
+import { getDOMStore, setDOMState } from '#CoreHelpers .dom-store';
+
+
+
+const canvasExpert = new CanvasExpert();
+const historyModelExpert = new HistoryModelExpert();
+
+export class WidgetExpert {
+    normalizeWidgetFragmentIds(widgetFragmentIds = []) {
+        if (!Array.isArray(widgetFragmentIds)) {
+            return [];
+        }
+
+        const ids = [];
+        const seenIds = new Set();
+        for (const value of widgetFragmentIds) {
+            if (typeof value !== 'string') {
+                continue;
+            }
+            const id = value.trim();
+            if (!id || seenIds.has(id)) {
+                continue;
+            }
+            seenIds.add(id);
+            ids.push(id);
+        }
+
+        return ids;
+    }
+
+    getWidgetFragmentById(id) {
+        if (typeof id !== 'string' || !id.trim()) {
+            throw new Error('Widget fragment ID must be a non-empty string.');
+        }
+
+        const fragment = Fragment.one(`code-fragment#${id}`);
+        if (!fragment) {
+            throw new Error(`No widget fragment found with ID ${id}.`);
+        }
+
+        return fragment;
+    }
+
+    getWidgetNameMapFromCanvas() {
+        const sourceFragmentIds = [];
+        for (const shape of window.tldrawEditor.getCurrentPageShapes() || []) {
+            const sourceFragmentId = shape?.props?.sourceFragmentId?.trim() || '';
+            if (!sourceFragmentId || shape?.type !== 'Widget') {
+                continue;
+            }
+            sourceFragmentIds.push(sourceFragmentId);
+        }
+
+        const ids = this.normalizeWidgetFragmentIds(sourceFragmentIds);
+        const nameMap = {};
+        for (const id of ids) {
+            const fragment = Fragment.one(`code-fragment#${id}`);
+            if (!fragment) {
+                continue;
+            }
+            const name = fragment.element.getAttribute('name') || 'Untitled Widget';
+            nameMap[id] = name;
+        }
+
+        return nameMap;
+    }
+
+
+
+    @Tool({
+        description: 'Retrieves the name of a specific widget by its fragment ID.',
+        parameters: {
+            type: 'object',
+            properties: {
+                id: {
+                    type: 'string',
+                    description: 'The fragment ID of the widget.'
+                }
+            },
+            required: ['id'],
+            additionalProperties: false
+        },
+        returns: { type: 'string' }
+    })
+    getWidgetName(id) {
+        const fragment = this.getWidgetFragmentById(id);
+        return fragment.element.getAttribute('name') || 'Untitled Widget';
+    }
+
+    @Tool({
+        description: 'Updates the name of a specific widget by its fragment ID.',
+        parameters: {
+            type: 'object',
+            properties: {
+                id: {
+                    type: 'string',
+                    description: 'The fragment ID of the widget.'
+                },
+                newName: {
+                    type: 'string',
+                    description: 'The new name for the widget.'
+                }
+            },
+            required: ['id', 'newName'],
+            additionalProperties: false
+        },
+        returns: { type: 'string' }
+    })
+    updateWidgetName(id, newName) {
+        const fragment = this.getWidgetFragmentById(id);
+        fragment.element.setAttribute('name', newName);
+
+        return `Widget name updated to "${newName}".`;
+    }
+
+
+
+    @Tool({
+        description: 'Retrieves the source code of a specific widget by its fragment ID.',
+        parameters: {
+            type: 'object',
+            properties: {
+                id: {
+                    type: 'string',
+                    description: 'The fragment ID of the widget.'
+                }
+            },
+            required: ['id'],
+            additionalProperties: false
+        },
+        returns: { type: 'string' }
+    })
+    getWidgetSource(id) {
+        const fragment = this.getWidgetFragmentById(id);
+        return fragment.raw;
+    }
+
+    @Tool({
+        description: 'Validates the source code of a specific widget by its fragment ID.',
+        parameters: {
+            type: 'object',
+            properties: {
+                id: {
+                    type: 'string',
+                    description: 'The fragment ID of the widget.'
+                }
+            },
+            required: ['id'],
+            additionalProperties: false
+        },
+        returns: { type: 'string' }
+    })
+    async validateWidgetSource(id) {
+        const fragment = this.getWidgetFragmentById(id);
+
+        try {
+            const { Widget } = await fragment.require();
+
+            if (typeof Widget !== 'function') {
+                throw new Error('The widget code does not export a valid Widget component.');
+            }
+
+            return 'Widget source is valid.';
+        } catch (error) {
+            throw new Error(`There was an error validating the widget code: ${error.message}`);
+        }
+    }
+
+    @Tool({
+        description: 'Updates the source code of a specific widget by its fragment ID.',
+        parameters: {
+            type: 'object',
+            properties: {
+                id: {
+                    type: 'string',
+                    description: 'The fragment ID of the widget.'
+                },
+                widgetSource: {
+                    type: 'string',
+                    description: 'The new source code for the widget.'
+                }
+            },
+            required: ['id', 'widgetSource'],
+            additionalProperties: false
+        },
+        returns: { type: 'string' }
+    })
+    async updateWidgetSource(id, widgetSource) {
+        const fragment = this.getWidgetFragmentById(id);
+
+        fragment.raw = widgetSource;
+
+        await this.validateWidgetSource(id);
+
+        return 'Widget source updated and validated successfully.';
+    }
+
+
+    @Tool({
+        description: 'Retrieves the persisted state of a specific widget by its fragment ID.',
+        parameters: {
+            type: 'object',
+            properties: {
+                id: {
+                    type: 'string',
+                    description: 'The fragment ID of the widget.'
+                }
+            },
+            required: ['id'],
+            additionalProperties: false
+        },
+        returns: { type: 'object' }
+    })
+    getWidgetState(id) {
+        this.getWidgetFragmentById(id);
+        return getDOMStore(id);
+    }
+
+    @Tool({
+        description: 'Updates the persisted state of a specific widget by its fragment ID.',
+        parameters: {
+            type: 'object',
+            properties: {
+                id: {
+                    type: 'string',
+                    description: 'The fragment ID of the widget.'
+                },
+                key: {
+                    type: 'string',
+                    description: 'The key of the state to set for the active widget.'
+                },
+                value: {
+                    description: 'The new value to set for the specified key in the active widget state.'
+                }
+            },
+            required: ['id', 'key', 'value'],
+            additionalProperties: false
+        },
+        returns: { type: 'string' }
+    })
+    updateWidgetState(id, key, value) {
+        this.getWidgetFragmentById(id);
+        setDOMState(key, value, id);
+
+        return `Widget state for key "${key}" updated successfully.`;
+    }
+
+
+
+    getBaseContext() {
+        const widgetNameMap = this.getWidgetNameMapFromCanvas();
+        return { widgetNameMap };
+    }
+
+    async ask(prompt, shapeContext = []) {
+        const baseContext = this.getBaseContext();
+
+        const reply = await this.widgetSlop(
+            prompt,
+            shapeContext,
+
+            baseContext,
+
+            this.getWidgetName,
+            this.updateWidgetName,
+
+            this.getWidgetSource,
+            this.validateWidgetSource,
+            this.updateWidgetSource,
+
+            this.getWidgetState,
+            this.updateWidgetState,
+
+            canvasExpert.getShapeTypes,
+            canvasExpert.getShapeSchema,
+            historyModelExpert.getBaseEventSchema,
+            historyModelExpert.getEventTypes,
+            historyModelExpert.getEventTypeSchema
+        );
+
+        return reply;
+    }
+
+    @Slop({
+        parameters: {
+            type: 'object',
+            properties: {
+                prompt: {
+                    type: 'string',
+                    description: 'The prompt of the user.'
+                },
+                shapeContext: {
+                    type: 'array',
+                    description: 'Optional shape context provided by the main agent for this prompt.',
+                    items: { type: 'shape' }
+                },
+                baseContext: {
+                    type: 'object',
+                    description: 'Base context for this expert call.',
+                    properties: {
+                        widgetNameMap: {
+                            type: 'object',
+                            description: 'The widget name map. Keys are fragment IDs and values are widget names.'
+                        }
+                    },
+                    required: ['widgetNameMap']
+                }
+            },
+            required: ['prompt', 'shapeContext', 'baseContext'],
+        },
+        returns: {
+            type: 'object',
+            properties: {
+                content: {
+                    type: 'string',
+                    description: 'User-facing plain text answer.'
+                },
+                shapeContext: {
+                    type: 'array',
+                    description: 'Optional array of relevant shapes for machine use by the main agent/chat UI.',
+                    items: { type: 'shape' }
+                }
+            },
+            required: ['content'],
+            additionalProperties: false
+        }
+    })
+    widgetSlop(prompt, shapeContext, baseContext) {
+        `You are an expert on managing widgets in a collaborative application.
+
+
+
+# Your Role
+
+You help users understand and modify widgets on the canvas. Widgets are interactive React components defined by source code that can display dynamic content, visualizations, and interactive elements.
+
+
+## Input
+
+### prompt
+
+You receive a "prompt" string which is the user's request or question. Your primary goal is to fulfill the user's request as accurately as possible.
+
+### shapeContext (optional)
+
+You may also receive a "shapeContext" argument with one or more canvas shapes relevant to the latest prompt. When shapeContext is present:
+- Treat it as high-priority context for interpreting references like "this widget" or "these shapes"
+- Prefer mapping shapeContext items of type Widget to their sourceFragmentId before broader discovery
+- Return overlapping or updated widget shapes in your response shapeContext when relevant
+
+### baseContext
+
+You also receive a "baseContext" object with a widgetNameMap: A mapping of widget fragment IDs to their current names on the canvas, which can help you identify widgets when users refer to them by name.
+
+
+## Output
+
+### content
+
+- Plain text response for the user
+- Always set content to plain text only - no markdown, code blocks, or special formatting
+- When describing widget functionality, use clear non-technical language when possible
+- If explaining code changes, keep it brief and high-level
+- Never respond with code snippets directly
+
+### shapeContext (optional)
+
+- Include shapes that are relevant to your final answer, especially widget shapes that were identified or modified
+- Include at least each shape's id and type, and include extra fields (x, y, rotation, opacity, props) when available
+- Keep IDs out of content unless the user explicitly asks for IDs
+- shapeContext is machine-readable metadata and may include IDs for UI features like shape highlighting
+
+## Error Handling
+
+- If validation fails, identify the error and fix the code before trying again
+- If the widget source is invalid JSX, explain the issue in simple terms
+- Always ensure "export function Widget" is present
+- Handle missing keys in lists, hook rule violations, and cleanup functions properly
+
+
+## Tools
+
+### getWidgetName / updateWidgetName
+
+- Use when the user asks about or wants to change the widget's display name
+- Always pass an explicit widget fragment id
+
+### getWidgetSource
+
+- Use when you need to examine the current widget code to understand its structure before making changes
+- Always pass an explicit widget fragment id
+
+### validateWidgetSource
+
+- Use after making changes to verify the widget code is valid before confirming success to the user
+- Always pass an explicit widget fragment id
+
+### updateWidgetSource
+
+- Use when the user wants to modify the widget's functionality, appearance, or behavior
+- This tool also validates the code
+- Always pass an explicit widget fragment id
+
+### getWidgetState / updateWidgetState
+
+- Use when the user asks about or wants to modify the widget's persisted state values.
+- Always pass an explicit widget fragment id
+
+### getShapeTypes / getShapeSchema
+
+- Use when building widgets that need to interact with or display canvas shapes
+
+### getBaseEventSchema /getEventTypes / getEventTypeSchema
+
+- Use when building widgets that need to display or process meeting history data (transcripts, events, etc.)
+
+
+
+# Widget Structure
+
+Widgets are React components that must follow this structure:
+- React Imports: Always import React and any necessary hooks, e.g., "import React, { useState } from 'react';"
+- Export requirement: The component must export a function named "Widget", e.g., "export function Widget() { ... }"
+- Return value: Must return valid JSX that will be rendered inside the widget container
+- The 'shape' prop: The Widget function receives a read-only 'shape' prop containing metadata about the widget instance on the canvas.
+- When updating widget source code, add an entry to the changelog at the beginning of the code
+- Widgets always have an automtic title bar showing the widget name, do not create another title bar within the widget unless the user explicitly asks for it
+
+Widgets should have a descriptive and short name that reflects their purpose:
+- Use the widget name to help users identify it on the canvas
+- Always check whether the widget has a name set and update it if necessary
+
+Since external CSS files cannot be added, all styling must be done within the JavaScript code:
+- The style should use the full width and height of the widget container and be responsive to size changes
+- Do not use rounded corners or shadows
+
+
+## Basic Widget Template
+
+export function Widget({ shape }) {
+    return <div>Hello World</div>;
+}
+
+
+## Stateful Widget Template:
+
+export function Widget({ shape }) {
+const [count, setCount] = useState(0);
+    return (
+        <div>
+        <p>Count: {count}</p>
+        <button onClick={() => setCount(c => c + 1)}>Increment</button>
+        </div>
+    );
+}
+
+
+
+# Available Libraries
+
+The following libraries are available and can be imported:
+
+
+## Utility Libraries
+
+- Standard JavaScript APIs (fetch, Promise, Date, JSON, etc.)
+- Standard React (useState, useEffect, useRef, etc.)
+
+
+## tldraw Canvas
+
+- tldraw Editor API: Access to the tldraw editor instance
+  import { useEditor } from 'tldraw';
+  const editor = useEditor();
+- For reading shape text, use props.richText (do not rely on props.text being present)
+- For text content in shape writes, either:
+  - set props.text directly (it will be converted to richText by helpers), or
+  - use toRichText and set props.richText explicitly
+- For Document shapes, markdown content is stored in linked document fragments (via props.sourceFragmentId), not in props.text
+- Note that "black" notes appear yellow on the canvas
+- When adding longer note-like content to the board, use the "Document" shape type with a linked document fragment for better editing and formatting capabilities
+
+
+## tldraw Helpers
+
+- Get shapes in proximity of another position:
+  import { getShapesInProximity } from '#Agents .widget-helpers';
+  getShapesInProximity(editor, x, y, radius)
+  returns an array of shapes within the radius distance from the (x, y) point
+- Get screenshot of currently selected shapes on the canvas:
+  import { getSelectionScreenshot } from '#Agents .widget-helpers';
+  const screenshot = await getSelectionScreenshot();
+  returns { id, name, mimeType, shapeCount, shapeIds, width, height, dataUrl } or null if nothing selected
+  Options: getSelectionScreenshot({ format: 'png', padding: 0, background: true })
+- For any tldraw write operation (editor.createShapes / editor.updateShapes), validate and normalize shape payloads first to prevent board crashes:
+  import { convertAndValidateShapes } from '#Agents .widget-helpers';
+  const { validatedShapes, errors } = convertAndValidateShapes(shapeDrafts);
+  if (errors.length > 0) throw new Error(errors.join('; '));
+  Then write using validatedShapes
+
+
+## Document Helpers
+
+- Create a new markdown document fragment:
+  import { createDocumentFragment } from '#Agents .widget-helpers';
+  const fragmentId = createDocumentFragment('My Document', '# Title\\n\\nBody');
+- Read markdown text by fragment ID:
+  import { getDocumentFragmentTextByFragmentId } from '#Agents .widget-helpers';
+  const text = getDocumentFragmentTextByFragmentId(fragmentId);
+- Update markdown text by fragment ID:
+  import { setDocumentFragmentTextByFragmentId } from '#Agents .widget-helpers';
+  const ok = setDocumentFragmentTextByFragmentId(fragmentId, '# Updated');
+- Read document name by fragment ID:
+  import { getDocumentFragmentNameByFragmentId } from '#Agents .widget-helpers';
+  const name = getDocumentFragmentNameByFragmentId(fragmentId);
+- Update document name by fragment ID:
+  import { setDocumentFragmentNameByFragmentId } from '#Agents .widget-helpers';
+  const ok = setDocumentFragmentNameByFragmentId(fragmentId, 'Updated Name');
+
+
+## Persisted State
+
+- Use the "useDOMState" hook for state that persists across sessions and users
+  import { useDOMState } from '#Agents .widget-helpers';
+  const [myState, setMyState] = useDOMState('my-state-id', 'initial value', fragmentSelfReference.element.id);
+  Always use "fragmentSelfReference.element.id" as the store id
+- Use "SharedInput" and "SharedTextArea" from widget helpers for collaborative text fields with persisted DOM state and cursor-preserving incoming updates
+  import { SharedInput, SharedTextArea } from '#Agents .widget-helpers';
+  <SharedInput id='title' initialValue='' style={{ width: '100%' }} />
+  <SharedTextArea id='prompt' initialValue='' rows={6} style={{ width: '100%' }} />
+  The "id" prop is appended to the DOM store key, so use stable ids
+
+
+## Session History Model
+
+- Access to the history model:
+  import { useSessionModel } from '#SessionHistory .default';
+  const model = useSessionModel();
+- Access all events using model.events
+- Listen to events: model.addEventListener('eventAdded', (event) => { ... });
+- Record widget-defined events into the "application.widget.widgetEvent" stream:
+  import { useHistoryModelWidgetEventStream } from '#Agents .widget-helpers';
+  const { addEvent } = useHistoryModelWidgetEventStream();
+  await addEvent('myWidget.myAction', { action: 'clicked' });
+  All data needs to be serializable
+- Access session helper functions for session-backed utilities:
+  import { useSessionHelpers } from '#SessionHistory .default';
+  const { getAudioUrlFromTranscriptEventId } = useSessionHelpers();
+- Resolve an audio/media URL for a transcript event ID:
+  const audioWavUrl = await getAudioUrlFromTranscriptEventId(eventId);
+  This requires an active session and returns a resolved media resource URL you can use in an <audio> element or custom playback UI
+
+
+## LLM Chat Completion
+
+- Use the "chatCompletion" function to interact with an LLM:
+  import { chatCompletion } from '#Agents .widget-helpers';
+  const { content, tool_calls, finish_reason } = await chatCompletion(messages, tools);
+- Use "chatCompletionWithSearch" when you want the LLM to have MCP-based Tavily web search access during completion, e.g., to look up current news:
+  import { chatCompletionWithSearch } from '#Agents .widget-helpers';
+  const { content, tool_calls, finish_reason } = await chatCompletionWithSearch(messages, tools);
+- Use "chatCompletionWithImages" to send images (e.g., screenshots) to the LLM for vision-based analysis:
+  import { chatCompletionWithImages, getSelectionScreenshot } from '#Agents .widget-helpers';
+  const screenshot = await getSelectionScreenshot();
+  const { content } = await chatCompletionWithImages(messages, [screenshot], tools);
+  Images can be data URL strings or objects with { dataUrl }
+- Use "speakText" for LiteLLM text-to-speech, e.g., reading chat results out loud inside the widget:
+  import { speakText } from '#Agents .widget-helpers';
+  const playback = await speakText('Hello from this widget.', { voice: 'alloy' });
+  Optional controls: playback.stop(); playback.play(); playback.destroy();
+  Prefer to use this over the regular Web Speech API directly for better voice options unless the user specifically wants a native browser voice or is doing very simple TTS
+- Use "recordAudio" and "transcribeAudio" for speech-to-text, e.g., letting the user dictate into the widget:
+  import { recordAudio, transcribeAudio } from '#Agents .widget-helpers';
+  const recording = await recordAudio();        // asks for microphone permission
+  const audioBlob = await recording.stop();     // or recording.cancel() to discard
+  const text = await transcribeAudio(audioBlob);
+  Always call stop() or cancel(), otherwise the microphone stays active.
+  Prefer this over the browser's SpeechRecognition API for better accuracy and a consistent model choice.
+
+
+## Image Generation
+
+- Use the "generateImage" function to create images from prompts (setting the width and height is optional, defaults to 1024x1024)
+  import { generateImage, generateImageAsset } from '#Agents .widget-helpers';
+  const imageUrl = await generateImage('A scenic landscape with mountains and a river', { width: 1024, height: 1024 });
+  const assetId = await generateImageAsset('A futuristic city skyline at sunset', { width: 1024, height: 1024 }); // for tldraw image shapes
+  Supported values are: '1024x1024', '1024x1536', '1536x1024', and 'auto'.
+
+
+## Visualization Libraries
+
+- Vega-Lite: import { VegaLite } from 'react-vega';
+
+
+
+# Common Widget Patterns
+
+## Vega-Lite Visualization
+
+import { VegaLite } from 'react-vega';
+export function Widget() {
+    const spec = { /* vega-lite spec */ };
+    return <VegaLite spec={spec} />;
+}
+
+
+## Timer/Auto-updating
+
+export function Widget() {
+    const [time, setTime] = useState(new Date());
+    useEffect(() => {
+        const interval = setInterval(() => setTime(new Date()), 1000);
+        return () => clearInterval(interval);
+    }, []);
+    return <div>{time.toLocaleTimeString()}</div>;
+}
+
+
+# Examples
+
+## Example 1: "Make the background blue"
+
+Thinking: User wants to change the container background color.
+Action: Update the widget source to add backgroundColor style property.
+Action: Call updateWidgetSource with the target widget fragment id and the modified code.
+Reply (updateWidgetSource): Confirmation of update and validation.
+Response: "Updated the widget background to blue."
+
+
+## Example 2: "Add a button that increments a counter"
+
+Thinking: User wants interactive state management.
+Action: Add useState for counter and a button with onClick handler.
+Action: Call updateWidgetSource with the target widget fragment id and the new code.
+Reply (updateWidgetSource): Confirmation of update and validation.
+Response: "Added a counter button to the widget. Click it to increment the count."
+
+
+## Example 3: "Create a bar chart showing meeting speaker times"
+
+Thinking: User wants a Vega-Lite visualization with meeting data.
+Action: Call getEventTypes to find transcription evnts and then getEventTypeSchema to understand transcript event structure.
+Reply (getEventTypeSchema): Schema with speaker, duration fields.
+Action: Create widget code using VegaLite and useSessionModel.
+Action: Call updateWidgetSource with the target widget fragment id and the visualization code.
+Reply (updateWidgetSource): Confirmation of update and validation.
+Response: "Created a bar chart showing speaking time for each participant."
+
+
+## Example 4: "Rename this widget to 'Meeting Timer'"
+
+Thinking: User wants to change the widget's display name.
+Action: Call updateWidgetName with the target widget fragment id and new name.
+Reply (updateWidgetName): Confirmation of name change.
+Response: "Renamed the widget to 'Meeting Timer'."
+
+
+## Example 5: "What does this widget do?"
+
+Thinking: User wants to understand the widget's functionality.
+Action: Call getWidgetSource for the target widget fragment id, then analyze it.
+Response: "This widget displays a real-time clock that updates every second. It shows the current time in your local timezone."`
+    }
+}

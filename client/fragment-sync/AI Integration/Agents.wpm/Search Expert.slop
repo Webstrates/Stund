@@ -1,0 +1,172 @@
+import { webSearch as baseWebSearch } from '#AIHelpers .default';
+
+
+
+export class SearchExpert {
+    @Tool({
+        description: 'Searches the web using Tavily via LiteLLM and returns structured search results.',
+        parameters: {
+            type: 'object',
+            properties: {
+                request: {
+                    type: 'object',
+                    description: 'Search request containing a query and optional Tavily search options.',
+                    properties: {
+                        query: {
+                            type: 'string',
+                            description: 'The search query.'
+                        },
+                        max_results: {
+                            type: 'number',
+                            description: 'Maximum number of results to return.'
+                        },
+                        topic: {
+                            type: 'string',
+                            description: 'Search topic, usually "general" or "news".'
+                        },
+                        search_depth: {
+                            type: 'string',
+                            description: 'Search depth, usually "basic" or "advanced".'
+                        },
+                        include_answer: {
+                            type: 'boolean',
+                            description: 'Whether to include a concise answer in the response if supported.'
+                        },
+                        include_raw_content: {
+                            type: 'boolean',
+                            description: 'Whether to include raw page content in the response if supported.'
+                        }
+                    },
+                    required: ['query'],
+                    additionalProperties: true
+                }
+            },
+            required: ['request'],
+            additionalProperties: false
+        },
+        returns: { type: 'object' }
+    })
+    async webSearch(request) {
+        if (!request || typeof request !== 'object' || Array.isArray(request)) {
+            throw new Error('request must be an object containing a query.');
+        }
+
+        const { query, ...searchOptions } = request;
+
+        if (typeof query !== 'string' || !query.trim()) {
+            throw new Error('request.query must be a non-empty string.');
+        }
+
+        return await baseWebSearch(query, searchOptions);
+    }
+
+
+
+    getBaseContext() {
+        const currentTimeEpoch = Date.now();
+        const currentTimeHuman = new Date(currentTimeEpoch).toLocaleString();
+
+        return {
+            currentTimeEpoch,
+            currentTimeHuman
+        };
+    }
+
+    async ask(prompt) {
+        const baseContext = this.getBaseContext();
+
+        const reply = await this.searchSlop(
+            prompt,
+
+            baseContext,
+
+            this.webSearch
+        );
+
+        return reply;
+    }
+
+    @Slop({
+        parameters: {
+            type: 'object',
+            properties: {
+                prompt: {
+                    type: 'string',
+                    description: 'The prompt of the user.'
+                },
+                baseContext: {
+                    type: 'object',
+                    description: 'Base context for this expert call.',
+                    properties: {
+                        currentTimeEpoch: {
+                            type: 'number',
+                            description: 'Current time as epoch milliseconds.'
+                        },
+                        currentTimeHuman: {
+                            type: 'string',
+                            description: 'Current time as a human-readable local timestamp.'
+                        }
+                    },
+                    required: ['currentTimeEpoch', 'currentTimeHuman']
+                }
+            },
+            required: ['prompt', 'baseContext']
+        },
+        returns: { type: 'string' }
+    })
+    searchSlop(prompt, baseContext) {
+        `You are an expert on web search for a collaborative meeting application.
+
+
+# Your Role
+
+You answer user questions by searching the web with the webSearch tool. Use it whenever facts, citations, current events, or date-sensitive information are needed.
+
+
+## Input
+
+### prompt
+
+You receive a "prompt" string which is the user's request or question.
+
+### baseContext
+
+You receive current time information in baseContext:
+- baseContext.currentTimeEpoch (epoch milliseconds)
+- baseContext.currentTimeHuman (human-readable local timestamp)
+
+Use this when handling requests about "today", "latest", "recent", deadlines, or relative dates.
+
+
+## Output
+
+### content
+
+- Return plain text only (the tool return type is a plain string)
+- Summarize findings clearly and concisely
+- Include source URLs when available
+- If sources conflict, mention the conflict
+- If no reliable result is found, clearly say so
+- Never fabricate facts or sources
+
+
+## Error Handling
+
+- If search fails, explain that web search failed and suggest retrying
+- If the prompt is ambiguous, state your assumptions and search accordingly
+- If results are weak or incomplete, say so and propose a narrower follow-up query
+
+
+## Tools
+
+### webSearch
+
+Use webSearch to gather information from the web.
+- Always call webSearch before resolving, unless the prompt is empty/invalid
+- For recent events, use topic: "news"
+- Prefer specific queries over broad queries
+- If first results are insufficient, refine query and search again
+- Use max_results to get enough coverage for synthesis
+- Do not call the tool more than 3 times per user prompt`
+    }
+}

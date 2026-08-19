@@ -1,0 +1,906 @@
+import { HistoryModelExpert } from '#history-model-expert-slop';
+
+
+
+const PROCESSOR_FRAGMENT_CONTAINER_SELECTOR = '#processor-fragments';
+const SUPPORTED_PROCESSOR_TYPES = [
+    'ScriptProcessor',
+    'AIPromptProcessor',
+    'AIVisionProcessor'
+];
+
+const isObjectRecord = (value) => {
+    return value !== null && typeof value === 'object' && !Array.isArray(value);
+};
+
+const cloneWithoutCycles = (value, seen = new WeakSet()) => {
+    if (value === null || typeof value !== 'object') {
+        return value;
+    }
+
+    if (seen.has(value)) {
+        return undefined;
+    }
+
+    if (Array.isArray(value)) {
+        seen.add(value);
+        const clonedArray = [];
+        for (const item of value) {
+            const clonedItem = cloneWithoutCycles(item, seen);
+            if (clonedItem !== undefined) {
+                clonedArray.push(clonedItem);
+            }
+        }
+        seen.delete(value);
+        return clonedArray;
+    }
+
+    seen.add(value);
+    const clonedObject = {};
+    for (const [key, nestedValue] of Object.entries(value)) {
+        if (typeof nestedValue === 'function') {
+            continue;
+        }
+        const clonedNestedValue = cloneWithoutCycles(nestedValue, seen);
+        if (clonedNestedValue !== undefined) {
+            clonedObject[key] = clonedNestedValue;
+        }
+    }
+    seen.delete(value);
+
+    return clonedObject;
+};
+
+const PROCESSOR_BASE_CONFIG_SCHEMA = {
+    inputs: {
+        type: 'object',
+        description: 'Map of input event types consumed by this processor.',
+        additionalProperties: {
+            type: 'object'
+        },
+        default: {}
+    },
+    outputs: {
+        type: 'object',
+        description: 'Map of output event types produced by this processor.',
+        additionalProperties: {
+            type: 'object',
+            properties: {
+                schemaId: {
+                    type: 'string',
+                    description: 'Schema identifier for the output event data.'
+                }
+            },
+            required: ['schemaId'],
+            additionalProperties: true
+        },
+        default: {}
+    },
+    schemas: {
+        type: 'object',
+        description: 'Map of JSON schema definitions keyed by schema identifier.',
+        additionalProperties: {
+            type: 'object'
+        },
+        default: {}
+    }
+};
+
+
+
+const historyModelExpert = new HistoryModelExpert();
+
+export class ProcessorExpert {
+    getProcessorContainer() {
+        const container = document.querySelector(PROCESSOR_FRAGMENT_CONTAINER_SELECTOR);
+        if (!container) {
+            throw new Error('Could not find the processor container in the document.');
+        }
+        return container;
+    }
+
+    getProcessorFragmentById(id) {
+        const escapedId = CSS.escape(id);
+        const fragment = Fragment.one(`code-fragment#${escapedId}`);
+        if (!fragment) {
+            throw new Error(`No processor fragment found with id "${id}".`);
+        }
+        return fragment;
+    }
+
+    serializeProcessorDefinition(processorDefinition) {
+        return `export const processor = ${JSON.stringify(processorDefinition, null, 4)};\n`;
+    }
+
+    async readProcessorDefinitionFromFragment(fragmentId) {
+        const fragment = this.getProcessorFragmentById(fragmentId);
+        const exportsObject = await fragment.require();
+
+        if (!exportsObject || !exportsObject.processor) {
+            throw new Error(`Fragment "${fragmentId}" does not export "processor".`);
+        }
+
+        return exportsObject.processor;
+    }
+
+    async collectProcessorFragmentMeta(fragmentElement) {
+        const fragmentId = fragmentElement.id;
+        const fragmentName = fragmentElement.getAttribute('name') || 'Unnamed Processor';
+        const meta = {
+            fragmentId,
+            fragmentName,
+            valid: false
+        };
+
+        if (!fragmentId) {
+            meta.error = 'Processor fragment is missing an id.';
+            return meta;
+        }
+
+        try {
+            const definition = await this.readProcessorDefinitionFromFragment(fragmentId);
+            meta.valid = true;
+            meta.processorName = definition.name;
+            meta.processorType = definition.type;
+            meta.inputs = definition.options.inputs;
+            meta.outputs = definition.options.outputs;
+            meta.outputSchemas = Object.fromEntries(
+                Object.entries(definition.options.outputs || {}).map(([eventType, outputConfig]) => [eventType, outputConfig?.schemaId || null])
+            );
+            const session = window.sessionHistory?.session;
+            meta.active = !!(session?.schema?.processors?.[definition.name]);
+        } catch (error) {
+            meta.error = error?.message || String(error);
+        }
+
+        return meta;
+    }
+
+
+
+    @Tool({
+        description: 'Retrieves config schemas for supported processors and injects the shared inputs, outputs, and schemas fields.',
+        parameters: {
+            type: 'object',
+            properties: {
+                types: {
+                    type: 'array',
+                    items: { type: 'string' },
+                    description: 'Processor types to retrieve. Supported values: ScriptProcessor, AIPromptProcessor, AIVisionProcessor.'
+                }
+            },
+            required: ['types'],
+            additionalProperties: false
+        },
+        returns: { type: 'object' }
+    })
+    async getProcessorSchema(types) {
+        if (!window.sessionHistory?.session) {
+            throw new Error('Not connected to the session history.');
+        }
+
+        const requestedTypes = (Array.isArray(types) ? types : [types])
+            .filter(type => typeof type === 'string' && type.trim())
+            .map(type => type.trim());
+
+        if (requestedTypes.length === 0) {
+            throw new Error('types must be a non-empty array of processor type strings.');
+        }
+
+        const unsupportedTypes = requestedTypes.filter(type => !SUPPORTED_PROCESSOR_TYPES.includes(type));
+        if (unsupportedTypes.length > 0) {
+            throw new Error(`Unsupported processor type(s): ${unsupportedTypes.join(', ')}.`);
+        }
+
+        const supportedProcessorsResponse = await window.sessionHistory.session.getSupportedProcessors();
+        const supportedProcessors = supportedProcessorsResponse?.processors;
+
+        if (!supportedProcessors || typeof supportedProcessors !== 'object') {
+            throw new Error('Failed to read supported processors from session history.');
+        }
+
+        const result = {};
+        for (const processorType of requestedTypes) {
+            const processorSchema = supportedProcessors[processorType];
+            if (!processorSchema) {
+                throw new Error(`Processor schema for "${processorType}" was not found.`);
+            }
+
+            const safeProcessorSchema = isObjectRecord(processorSchema)
+                ? cloneWithoutCycles(processorSchema) || {}
+                : {};
+            const configSchema = isObjectRecord(safeProcessorSchema.configSchema)
+                ? safeProcessorSchema.configSchema
+                : {};
+            const configProperties = isObjectRecord(configSchema.properties)
+                ? configSchema.properties
+                : {};
+            const baseInputsSchema = cloneWithoutCycles(PROCESSOR_BASE_CONFIG_SCHEMA.inputs) || {};
+            const baseOutputsSchema = cloneWithoutCycles(PROCESSOR_BASE_CONFIG_SCHEMA.outputs) || {};
+            const baseSchemasSchema = cloneWithoutCycles(PROCESSOR_BASE_CONFIG_SCHEMA.schemas) || {};
+            const inputsSchema = isObjectRecord(configProperties.inputs) ? configProperties.inputs : {};
+            const outputsSchema = isObjectRecord(configProperties.outputs) ? configProperties.outputs : {};
+            const schemasSchema = isObjectRecord(configProperties.schemas) ? configProperties.schemas : {};
+            const configRequired = Array.isArray(configSchema.required)
+                ? configSchema.required.filter(item => typeof item === 'string')
+                : [];
+            const mergedRequired = Array.from(new Set([...configRequired, 'inputs', 'outputs', 'schemas']));
+
+            result[processorType] = {
+                ...safeProcessorSchema,
+                configSchema: {
+                    ...configSchema,
+                    type: 'object',
+                    properties: {
+                        ...configProperties,
+                        inputs: {
+                            ...baseInputsSchema,
+                            ...inputsSchema
+                        },
+                        outputs: {
+                            ...baseOutputsSchema,
+                            ...outputsSchema
+                        },
+                        schemas: {
+                            ...baseSchemasSchema,
+                            ...schemasSchema
+                        }
+                    },
+                    required: mergedRequired
+                }
+            };
+        }
+
+        return result;
+    }
+
+
+
+    @Tool({
+        description: 'Lists all processor with validation status and processor metadata.',
+        returns: { type: 'array' }
+    })
+    async getProcessors() {
+        const container = this.getProcessorContainer();
+        let fragments = Array.from(container.querySelectorAll(':scope > code-fragment'));
+        fragments = fragments.sort((a, b) => {
+            const aName = a.getAttribute('name') || a.id || '';
+            const bName = b.getAttribute('name') || b.id || '';
+            return aName.localeCompare(bName);
+        });
+
+        const results = [];
+
+        for (const fragmentElement of fragments) {
+            results.push(await this.collectProcessorFragmentMeta(fragmentElement));
+        }
+
+        return results;
+    }
+
+    @Tool({
+        description: 'Retrieves the name attribute of a processor fragment by id.',
+        parameters: {
+            type: 'object',
+            properties: {
+                id: {
+                    type: 'string',
+                    description: 'The fragment id of the processor.'
+                }
+            },
+            required: ['id'],
+            additionalProperties: false
+        },
+        returns: { type: 'string' }
+    })
+    getProcessorFragmentName(id) {
+        const fragment = this.getProcessorFragmentById(id);
+        return fragment.element.getAttribute('name') || 'Unnamed Processor';
+    }
+
+    @Tool({
+        description: 'Updates the name attribute of a processor fragment by id.',
+        parameters: {
+            type: 'object',
+            properties: {
+                id: {
+                    type: 'string',
+                    description: 'The fragment id of the processor.'
+                },
+                newName: {
+                    type: 'string',
+                    description: 'The new fragment name.'
+                }
+            },
+            required: ['id', 'newName'],
+            additionalProperties: false
+        },
+        returns: { type: 'string' }
+    })
+    updateProcessorFragmentName(id, newName) {
+        const fragment = this.getProcessorFragmentById(id);
+        fragment.element.setAttribute('name', newName.trim());
+        return `Processor fragment name updated to "${newName.trim()}".`;
+    }
+
+
+
+    @Tool({
+        description: 'Retrieves the normalized processor definition exported by a processor fragment.',
+        parameters: {
+            type: 'object',
+            properties: {
+                id: {
+                    type: 'string',
+                    description: 'The fragment id of the processor.'
+                }
+            },
+            required: ['id'],
+            additionalProperties: false
+        },
+        returns: { type: 'object' }
+    })
+    async getProcessorDefinition(id) {
+        return await this.readProcessorDefinitionFromFragment(id);
+    }
+
+    @Tool({
+        description: 'Validates a processor fragment definition by requiring it and checking structure for ScriptProcessor.',
+        parameters: {
+            type: 'object',
+            properties: {
+                id: {
+                    type: 'string',
+                    description: 'The fragment id of the processor.'
+                }
+            },
+            required: ['id'],
+            additionalProperties: false
+        },
+        returns: { type: 'string' }
+    })
+    async validateProcessorDefinition(id) {
+        const definition = await this.readProcessorDefinitionFromFragment(id);
+        return `Processor "${definition.name}" (${definition.type}) definition is valid.`;
+    }
+
+    @Tool({
+        description: 'Updates and validates a processor fragment by writing explicit processor fields: type, name, and options.',
+        parameters: {
+            type: 'object',
+            properties: {
+                id: {
+                    type: 'string',
+                    description: 'The fragment id of the processor.'
+                },
+                type: {
+                    type: 'string',
+                    description: 'Processor type. Supported values: "ScriptProcessor", "AIPromptProcessor", "AIVisionProcessor".'
+                },
+                name: {
+                    type: 'string',
+                    description: 'Processor name.'
+                },
+                options: {
+                    type: 'object',
+                    description: 'Processor options object.'
+                }
+            },
+            required: ['id', 'type', 'name', 'options'],
+            additionalProperties: false
+        },
+        returns: { type: 'string' }
+    })
+    async updateProcessorDefinition(id, type, name, options) {
+        const fragment = this.getProcessorFragmentById(id);
+        const previousSource = fragment.raw;
+        const processorDefinition = {
+            type,
+            name,
+            options
+        };
+        const nextSource = this.serializeProcessorDefinition(processorDefinition);
+
+        fragment.raw = nextSource;
+
+        try {
+            await this.validateProcessorDefinition(id);
+        } catch (error) {
+            fragment.raw = previousSource;
+            throw new Error(`Processor definition update rejected: ${error.message}`);
+        }
+
+        return 'Processor definition updated and validated successfully.';
+    }
+
+    @Tool({
+        description: 'Creates a new empty processor fragment with an auto-generated id and a human-readable fragment name.',
+        parameters: {
+            type: 'object',
+            properties: {
+                fragmentName: {
+                    type: 'string',
+                    description: 'The human-readable name attribute for the fragment.'
+                }
+            },
+            required: ['fragmentName'],
+            additionalProperties: false
+        },
+        returns: { type: 'object' }
+    })
+    createProcessorFragment(fragmentName) {
+        const container = this.getProcessorContainer();
+        const nextFragmentId = `processor-fragment-${crypto.randomUUID()}`;
+
+        const newFragment = Fragment.create('text/javascript+babel');
+
+        newFragment.element.id = nextFragmentId;
+        newFragment.element.setAttribute('name', fragmentName.trim());
+        newFragment.raw = '';
+
+        container.appendChild(newFragment.element);
+        if (typeof WPMv2 !== 'undefined' && typeof WPMv2.stripProtection === 'function') {
+            WPMv2.stripProtection(newFragment.element);
+        }
+
+        return {
+            fragmentId: nextFragmentId,
+            fragmentName: fragmentName.trim()
+        };
+    }
+
+    @Tool({
+        description: 'Activates a local processor fragment in the current session by reading its definition and registering it with the server.',
+        parameters: {
+            type: 'object',
+            properties: {
+                id: {
+                    type: 'string',
+                    description: 'The fragment id of the processor to activate.'
+                }
+            },
+            required: ['id'],
+            additionalProperties: false
+        },
+        returns: { type: 'string' }
+    })
+    async activateProcessor(id) {
+        const session = window.sessionHistory?.session;
+        if (!session) {
+            throw new Error('Not connected to a session.');
+        }
+
+        const definition = await this.readProcessorDefinitionFromFragment(id);
+        const processorName = definition.name;
+
+        if (session.schema?.processors?.[processorName]) {
+            throw new Error(`Processor "${processorName}" is already active.`);
+        }
+
+        await session.addProcessor(processorName, definition.type, definition.options);
+        return `Processor "${processorName}" activated successfully.`;
+    }
+
+    @Tool({
+        description: 'Deactivates a processor in the current session by removing it from the server.',
+        parameters: {
+            type: 'object',
+            properties: {
+                processorName: {
+                    type: 'string',
+                    description: 'The name of the processor to deactivate.'
+                }
+            },
+            required: ['processorName'],
+            additionalProperties: false
+        },
+        returns: { type: 'string' }
+    })
+    async deactivateProcessor(processorName) {
+        const session = window.sessionHistory?.session;
+        if (!session) {
+            throw new Error('Not connected to a session.');
+        }
+
+        if (!session.schema?.processors?.[processorName]) {
+            throw new Error(`Processor "${processorName}" is not currently active.`);
+        }
+
+        await session.removeProcessor(processorName);
+        return `Processor "${processorName}" deactivated successfully.`;
+    }
+
+    async getBaseContext() {
+        const session = window.sessionHistory?.session;
+
+        return {
+            processors: await this.getProcessors(),
+            sessionConnected: !!session,
+            historyModelBaseEventSchema: historyModelExpert.getBaseEventSchema(),
+            historyModelEventTypes: historyModelExpert.getEventTypes()
+        };
+    }
+
+    async ask(prompt) {
+        const baseContext = await this.getBaseContext();
+
+        const reply = await this.processorSlop(
+            prompt,
+            baseContext,
+
+            this.getProcessorSchema,
+
+            this.getProcessorFragmentName,
+            this.updateProcessorFragmentName,
+
+            this.createProcessorFragment,
+
+            this.getProcessorDefinition,
+            this.validateProcessorDefinition,
+            this.updateProcessorDefinition,
+
+            this.activateProcessor,
+            this.deactivateProcessor,
+
+            historyModelExpert.getEventTypeSchema
+        );
+
+        return reply;
+    }
+
+    @Slop({
+        parameters: {
+            type: 'object',
+            properties: {
+                prompt: {
+                    type: 'string',
+                    description: 'The user prompt.'
+                },
+                baseContext: {
+                    type: 'object',
+                    description: 'Base context for this expert call.',
+                    properties: {
+                        processors: {
+                            type: 'array',
+                            description: 'Local processor fragments with validation status, metadata, and an active flag indicating if the processor is running on the server.'
+                        },
+                        sessionConnected: {
+                            type: 'boolean',
+                            description: 'Whether the client is currently connected to a session.'
+                        },
+                        historyModelBaseEventSchema: {
+                            type: 'object',
+                            description: 'The base event schema from the history model.'
+                        },
+                        historyModelEventTypes: {
+                            type: 'array',
+                            items: { type: 'string' },
+                            description: 'Known event types from the history model.'
+                        }
+                    },
+                    required: ['processors', 'sessionConnected', 'historyModelBaseEventSchema', 'historyModelEventTypes']
+                }
+            },
+            required: ['prompt', 'baseContext']
+        },
+        returns: { type: 'string' }
+    })
+    processorSlop(prompt, baseContext) {
+        `You are an expert on processors for the meeting history model.
+
+
+# Your Role
+
+You help users create, inspect, and edit processors. A processor is a piece of code running on the history model server that processes other events or video feeds and produces new events.
+
+
+## Input
+
+### prompt
+
+You receive a "prompt" string which is the user's request or question. Your primary goal is to fulfill the user's request as accurately as possible.
+
+### baseContext
+
+You receive processor and history context in baseContext:
+- baseContext.processors — all local processor fragments with validation status, metadata, and an 'active' boolean indicating whether the processor is currently running on the server
+- baseContext.sessionConnected — whether the client is connected to a session
+- baseContext.historyModelBaseEventSchema
+- baseContext.historyModelEventTypes
+
+Use this context to target the correct processor and select valid input/output event types. Check each processor's 'active' field to know whether it is already running before activating or deactivating.
+
+
+## Output
+
+### content
+
+- Return plain text only (the tool return type is a plain string)
+- Keep responses concise and actionable
+- Summarize what was created or changed and mention fragment id + processor name
+
+
+## Error Handling
+
+- If a requested change would produce an invalid processor structure, fix it before confirming
+- If no processor fragment exists yet and the user asks to edit one, create it first
+- If multiple fragments have ambiguous names, use fragment IDs for precise targeting
+
+
+## Tools
+
+### getProcessorSchema
+
+Use this to retrieve config schemas for ScriptProcessor, AIPromptProcessor, and AIVisionProcessor before creating or updating options.
+
+### createProcessorFragment
+
+Use this to create a new empty processor fragment shell first. Then call updateProcessorDefinition with type, name, and options.
+
+### getProcessorFragmentName / updateProcessorFragmentName
+
+Use when the user asks about or wants to change the human-readable processor fragment name shown in the repository/list UI.
+
+### getProcessorDefinition
+
+Use this to inspect the current processor structure before editing.
+
+### validateProcessorDefinition
+
+Use this only for explicit validation-only checks when no update is being made.
+
+### updateProcessorDefinition
+
+Preferred for structured edits. Use this when changing processor name, type, inputs, outputs, schemas, script, or prompt.
+Always pass processor fields as separate arguments: type, name, options.
+This tool already validates the processor definition, so do not call validateProcessorDefinition after a successful update unless the user explicitly requests another validation pass.
+
+### activateProcessor
+
+Use this to activate a local processor fragment in the current session. Pass the fragment id. The tool reads the processor definition from the fragment and registers it with the server. Only use on valid, non-active processors.
+
+### deactivateProcessor
+
+Use this to deactivate (remove) a running processor from the current session. Pass the processor name (not the fragment id). Only use on currently active processors.
+
+### getEventTypeSchema
+
+Use this to retrieve schemas for one or more event types (pass an array of types) before authoring processor inputs/outputs.
+
+
+
+# Processor Structure
+
+Each processor setup has:
+- fragmentName: human-readable fragment name shown in the processor list/repository
+- type: processor type
+- name: stable processor identifier (this becomes the server processor id when activated)
+- options: processor configuration object
+
+Supported processor types:
+- ScriptProcessor
+- AIPromptProcessor
+- AIVisionProcessor
+
+
+## Common Options (All Processor Types)
+
+Every processor options object must include:
+- options.inputs
+- options.outputs
+- options.schemas
+
+- Keep outputs and schemas synchronized so each output schemaId has a matching schema in options.schemas
+- Never use wildcard input patterns like '.*'; this can include processor/debug streams and create expensive loops
+
+
+## ScriptProcessor
+
+Required options:
+- script (string, non-empty)
+- language (string, currently has to be 'js')
+- maxExecutionTimeMs (integer, sensible default: 1000)
+- maxExecutionStatements (integer, sensible default: 20000)
+
+Authoring notes:
+- Implement init(), onEventAdded(event), and optionally onEventUpdated(event)
+
+
+## AIPromptProcessor
+
+Required options:
+- prompt (string, non-empty)
+- model (string, good default is 'cavi/small')
+- allowDurationEvents (boolean)
+- allowInstantEvents (boolean)
+- combineStreams (boolean)
+- emitExceptionEvents (boolean)
+- emitLogEvents (boolean)
+- useResponses (boolean, must be false)
+
+Optional options:
+- additionalInputContext (integer)
+- additionalOutputContext (integer)
+- includeTentative (boolean)
+- intervalSeconds (integer)
+- inactivitySeconds (integer)
+- eventChunkSize (integer)
+
+Authoring notes:
+- Ensure at least one of allowDurationEvents or allowInstantEvents is true
+- Prefer combineStreams=true; set false only for per-stream behavior
+- additionalInputContext/additionalOutputContext are mainly useful with duration events
+- emitLogEvents and emitExceptionEvents are useful during setup/debugging; disable later if too noisy
+
+
+## AIVisionProcessor
+
+Required options:
+- prompt (string, non-empty)
+- allowDurationEvents (boolean)
+- allowInstantEvents (boolean)
+
+Optional options:
+- model (string, good default is 'cavi/small')
+
+Input streams for vision processing:
+- 'user.camera.video' for participant camera feed
+- 'user.screen.video' for participant screen sharing
+
+Authoring notes:
+- Ensure at least one of allowDurationEvents or allowInstantEvents is true
+- Prompt should clearly describe what to analyze and when output events should be created, extended, or closed
+
+
+## Trigger Behavior
+
+- Configure at least one of intervalSeconds, inactivitySeconds, or eventChunkSize
+- Prefer intervalSeconds as the default trigger and combine with inactivitySeconds/eventChunkSize only when needed
+- If none are set, the processor runs on every event (usually undesirable)
+- You can combine triggers
+- The first trigger condition to fire resets all trigger timers/counters
+
+
+## Event-Type Planning
+
+- The current known event types are available in baseContext.historyModelEventTypes
+- Always confirm event schemas before designing processor outputs for new event types
+
+
+
+# Processor Templates
+
+Use these templates as your canonical starting point when creating or updating processors.
+
+## ScriptProcessor Template
+
+{
+    type: 'ScriptProcessor',
+    name: 'exampleScriptProcessor',
+    options: {
+        script: "let outputStream;
+
+            function init() {
+                outputStream = stund.startEventStream('processor.interaction.example');
+            }
+
+            function onEventAdded(event) {
+                // React to new input events here and write to the output stream when needed
+                outputStream.createInstantEvent({ textLength: event.data.text.length }, event.start, event.entity);
+            }
+
+            function onEventUpdated(event) {
+                // Handle tentative event updates when needed.
+            }",
+        language: 'js',
+        maxExecutionTimeMs: 1000,
+        maxExecutionStatements: 20000,
+        inputs: {
+            'event.name': {}
+        },
+        outputs: {
+            'processor.interaction.example': {
+                schemaId: 'stund://exampleOutputSchema.json'
+            }
+        },
+        schemas: {
+            'stund://exampleOutputSchema.json': {
+                '$schema': 'http://json-schema.org/draft-07/schema#',
+                title: 'Example Output',
+                type: 'object',
+                properties: {
+                    textLength: {
+                        type: 'number'
+                    }
+                },
+                required: ['textLength'],
+                additionalProperties: false
+            }
+        }
+    }
+}
+
+## AIPromptProcessor Template
+
+{
+    type: 'AIPromptProcessor',
+    name: 'exampleAIPromptProcessor',
+    options: {
+        model: 'cavi/small',
+        prompt: 'Summarize each chunk into one concise sentence and include a confidence estimate from 0 to 1.',
+        additionalInputContext: 0,
+        additionalOutputContext: 0,
+        allowDurationEvents: true,
+        allowInstantEvents: true,
+        combineStreams: true,
+        emitExceptionEvents: true,
+        emitLogEvents: true,
+        includeTentative: false,
+        intervalSeconds: 30,
+        useResponses: false,
+        inputs: {
+            'transcription.text.final': {}
+        },
+        outputs: {
+            'processor.summary.segment': {
+                schemaId: 'stund://summarySchema.json'
+            }
+        },
+        schemas: {
+            'stund://summarySchema.json': {
+                '$schema': 'http://json-schema.org/draft-07/schema#',
+                title: 'Segment Summary',
+                type: 'object',
+                properties: {
+                    summary: {
+                        type: 'string'
+                    },
+                    confidence: {
+                        type: 'number'
+                    }
+                },
+                required: ['summary'],
+                additionalProperties: false
+            }
+        }
+    }
+}
+
+## AIVisionProcessor Template
+
+{
+    type: 'AIVisionProcessor',
+    name: 'raisedHandDetector',
+    options: {
+        prompt: 'If a person is present and they have their hand raised as if they want to say something create or extend an output event. If no person is present or no hand is raised, close the existing events and do nothing.',
+        intervalSeconds: 5,
+        allowDurationEvents: true,
+        allowInstantEvents: false,
+        inputs: {
+            'user.camera.video': {}
+        },
+        outputs: {
+            'processor.raisedHand': {
+                schemaId: 'stund://raisedHand.json'
+            }
+        },
+        schemas: {
+            'stund://raisedHand.json': {
+                '$schema': 'http://json-schema.org/draft-07/schema#',
+                title: 'Raised Hand Detection',
+                description: 'AI detects gestures from input video snapshots.',
+                type: 'object',
+                properties: {
+                    hand: {
+                        type: 'string',
+                        description: 'Their left, right, or both hands.'
+                    }
+                },
+                required: ['hand'],
+                additionalProperties: false
+            }
+        }
+    }
+}`
+    }
+}

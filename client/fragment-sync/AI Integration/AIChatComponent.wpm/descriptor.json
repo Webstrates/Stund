@@ -1,0 +1,18 @@
+{
+    "description": "An embeddable AI chat component",
+    "dependencies": [
+        "#AIHelpers",
+        "#CanvasHelpers",
+        "#CoreHelpers",
+        "#ModelManager",
+        "webstrate-components-repos #wsc-icon-registry",
+        "webstrate-components-repos #MaterialDesignOutlinedIcons",
+        "webstrate-components-repos #ButtonSystem",
+        "webstrate-components-repos #ButtonSystem_MaterialDesign",
+        "webstrate-components-repos #MenuSystem",
+        "webstrate-components-repos #MaterialMenu",
+        "webstrate-components-repos #WebstrateComponents_Tools"
+    ],
+    "assets": [],
+    "version": "0.1.0"
+}

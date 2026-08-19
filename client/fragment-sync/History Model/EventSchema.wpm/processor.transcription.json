@@ -1,0 +1,15 @@
+{
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "description": "Schema for transcription event containing speech-to-text results and confidence metrics.",
+    "type": "object",
+    "properties": {
+        "text": {
+            "type": "string",
+            "description": "The transcribed text from the audio."
+        }
+    },
+    "required": [
+        "text"
+    ],
+    "additionalProperties": false
+}

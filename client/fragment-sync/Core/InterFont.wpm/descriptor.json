@@ -1,0 +1,8 @@
+{
+    "description": "Adds the Inter (v4.1) font and applies it as the default sans-serif font.",
+    "dependencies": [],
+    "assets": [
+        "inter-font.zip"
+    ],
+    "version": "0.1.0"
+}

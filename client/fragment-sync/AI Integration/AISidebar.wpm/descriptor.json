@@ -1,0 +1,12 @@
+{
+    "description": "AI sidebar interface and chat orchestration.",
+    "dependencies": [
+        "#AIChatComponent",
+        "#CanvasHelpers",
+        "#CoreHelpers",
+        "#ModelManager",
+        "#SlopScript"
+    ],
+    "assets": [],
+    "version": "0.1.0"
+}

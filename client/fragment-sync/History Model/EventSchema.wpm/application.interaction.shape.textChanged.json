@@ -1,0 +1,34 @@
+{
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "description": "Schema for shape text changed event. This is a duration event that tracks text content changes in shapes, batching rapid edits into a single event that ends after 1500ms of inactivity.",
+    "type": "object",
+    "properties": {
+        "shapeId": {
+            "type": "string",
+            "description": "The unique identifier of the shape whose text was changed"
+        },
+        "shapeType": {
+            "type": "string",
+            "description": "The type of the shape (e.g., 'note', 'text', 'geo')"
+        },
+        "richTextStart": {
+            "type": "object",
+            "description": "The rich text content of the shape at the start of the editing session"
+        },
+        "richTextEnd": {
+            "type": "object",
+            "description": "The rich text content of the shape at the end of the editing session"
+        },
+        "reason": {
+            "type": "string",
+            "description": "Optional reason for ending the text change event (e.g., 'deleted', 'cleanup')"
+        }
+    },
+    "required": [
+        "shapeId",
+        "shapeType",
+        "richTextStart",
+        "richTextEnd"
+    ],
+    "additionalProperties": false
+}

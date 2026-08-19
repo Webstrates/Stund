@@ -1,0 +1,30 @@
+{
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "description": "Schema for shape color changed event. This is an instant event triggered when a shape's color property changes.",
+    "type": "object",
+    "properties": {
+        "shapeId": {
+            "type": "string",
+            "description": "The unique identifier of the shape whose color was changed"
+        },
+        "shapeType": {
+            "type": "string",
+            "description": "The type of the shape (e.g., 'note', 'text', 'geo', 'draw')"
+        },
+        "colorStart": {
+            "type": "string",
+            "description": "The color of the shape before the change"
+        },
+        "colorEnd": {
+            "type": "string",
+            "description": "The color of the shape after the change"
+        }
+    },
+    "required": [
+        "shapeId",
+        "shapeType",
+        "colorStart",
+        "colorEnd"
+    ],
+    "additionalProperties": false
+}

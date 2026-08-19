@@ -1,0 +1,12 @@
+{
+    "description": "Stund information panel with project details, changelog, and state transfer tools.",
+    "dependencies": [
+        "#Dialog"
+    ],
+    "assets": [
+        "manifest.json",
+        "favicon.ico",
+        "stund-icons.zip"
+    ],
+    "version": "0.1.0"
+}

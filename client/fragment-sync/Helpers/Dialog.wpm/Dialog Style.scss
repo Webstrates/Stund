@@ -1,0 +1,839 @@
+@mixin button-font {
+    font-weight: 500;
+    font-size: 13px;
+    letter-spacing: 0.25px;
+}
+
+@mixin dialog-action-button-style {
+    @include button-font;
+
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    min-height: 32px;
+    padding: 8px 16px;
+    border: 1px solid #90a4ae;
+    border-radius: 4px;
+    background: #cfd8dc;
+    color: #263238;
+    cursor: pointer;
+    user-select: none;
+    transition: all 0.15s ease;
+    white-space: nowrap;
+    line-height: 1.2;
+
+    &:hover {
+        background: #b0bec5;
+        border-color: #78909c;
+    }
+
+    &:active {
+        background: #90a4ae;
+        border-color: #607d8b;
+        transform: translateY(1px);
+    }
+
+    &:disabled {
+        background: #eceff1;
+        color: #90a4ae;
+        border-color: #cfd8dc;
+        cursor: not-allowed;
+    }
+
+    &:disabled:hover,
+    &:disabled:active {
+        background: #eceff1;
+        color: #90a4ae;
+        border-color: #cfd8dc;
+        transform: none;
+    }
+
+    &.active {
+        background: #4caf50;
+        color: #fff;
+
+        &:hover {
+            background: #43a047;
+        }
+
+        &:active {
+            background: #388e3c;
+        }
+    }
+
+    &.danger {
+        background: #ffebee;
+        color: #b71c1c;
+        border: 1px solid #ef9a9a;
+
+        &:hover {
+            background: #ffcdd2;
+            border-color: #e57373;
+        }
+
+        &:active {
+            background: #ef9a9a;
+            border-color: #e57373;
+        }
+    }
+
+    .material-icons,
+    .icon {
+        font-size: 16px;
+    }
+}
+
+.dialog-modal {
+    position: absolute;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    right: 0;
+    z-index: 100001;
+    -webkit-backdrop-filter: blur(8px);
+    backdrop-filter: blur(8px);
+    background: rgba(96, 96, 96, .25) !important;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 12px;
+
+    // Animation states
+    opacity: 0;
+
+    &.dialog-enter {
+        animation: dialog-fade-in 0.2s ease-out forwards;
+
+        .dialog {
+            animation: dialog-scale-in 0.2s ease-out forwards;
+        }
+    }
+
+    &.dialog-exit {
+        animation: dialog-fade-out 0.15s ease-in forwards;
+
+        .dialog {
+            animation: dialog-scale-out 0.15s ease-in forwards;
+        }
+    }
+
+    .dialog {
+        background: #fafafa;
+        border: 1px solid #b0bec5;
+        border-radius: 16px;
+        padding: 0;
+        display: flex;
+        flex-direction: column;
+        flex-wrap: nowrap;
+        gap: 0;
+        width: calc(100% - 24px);
+        box-shadow: 0 16px 32px rgba(38, 50, 56, 0.22);
+        max-width: 768px;
+        max-height: calc(80vh - 32px - 24px);
+        align-self: flex-start;
+        margin-top: 10vh;
+        overflow: hidden;
+
+        .dialog-header {
+            padding: 16px;
+            border-bottom: 1px solid #cfd8dc;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 14px;
+            background: linear-gradient(180deg, #eceff1, #dfe8eb);
+        }
+
+        .dialog-title-row {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            color: #263238;
+            min-width: 0;
+        }
+
+        .dialog-title-icon {
+            font-size: 24px;
+            flex: 0 0 auto;
+        }
+
+        .dialog-title {
+            font-size: 18px;
+            line-height: 22px;
+            margin: 0;
+            font-weight: 650;
+            color: #263238;
+        }
+
+        button.dialog-close-button {
+            border: 1px solid #b0bec5;
+            border-radius: 50%;
+            padding: 0;
+            width: 32px;
+            min-width: 32px;
+            height: 32px;
+            min-height: 32px;
+            line-height: 1;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            user-select: none;
+            transition: background 0.2s ease, transform 0.2s ease;
+            background: #eceff1;
+            color: #607d8b;
+            flex: 0 0 auto;
+
+            .material-icons {
+                font-size: 18px;
+            }
+
+            &:hover {
+                background: #dfe5e8;
+                color: #455a64;
+            }
+
+            &:active {
+                background: #cfd8dc;
+                transform: translateY(1px);
+            }
+        }
+
+        .dialog-body {
+            padding: 16px;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            min-height: 0;
+            overflow-y: auto;
+        }
+
+        h1,
+        h2,
+        h3,
+        h4,
+        h5,
+        h6,
+        p {
+            margin: 0;
+        }
+
+        h1 {
+            font-size: 20px;
+            color: #333;
+            padding-bottom: 12px;
+            border-bottom: 1px solid #ddd;
+        }
+
+        h2 {
+            font-size: 15px;
+            font-weight: 600;
+            color: #444;
+        }
+
+        h3 {
+            font-size: 13px;
+            font-weight: 600;
+            color: #555;
+        }
+
+        hr {
+            width: 100%;
+            border-color: #f1f1f1;
+            border: none;
+            border-top: 1px solid;
+            margin: 4px 0;
+        }
+
+        button {
+            @include button-font;
+
+            user-select: none;
+            border-radius: 4px;
+            padding: 2px 8px;
+            background: #636363;
+            color: #fff;
+            vertical-align: middle;
+            text-align: center;
+            cursor: pointer;
+            border: none;
+            height: 24px;
+
+            &:hover {
+                background: #848484;
+            }
+
+            &:active {
+                background: #606060;
+            }
+
+            &.red {
+                background: #d32f2f !important;
+
+                &:hover {
+                    background: #ff6659 !important;
+                }
+
+                &:active {
+                    background: #9a0007 !important;
+                }
+            }
+
+            &.green {
+                background: #2e7d32 !important;
+
+                &:hover {
+                    background: #60ad5e !important;
+                }
+
+                &:active {
+                    background: #005005 !important;
+                }
+            }
+        }
+
+        button.dialog-action-button {
+            @include dialog-action-button-style;
+        }
+
+        .dialog-toggle-list {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .dialog-toggle-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            padding: 10px 12px;
+            border-radius: 10px;
+            border: 1px solid #cfd8dc;
+            background: #f5f7f8;
+            box-sizing: border-box;
+            min-width: 0;
+            cursor: pointer;
+            user-select: none;
+            transition: background 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
+        }
+
+        .dialog-toggle-row:focus-visible {
+            outline: none;
+            box-shadow: 0 0 0 2px rgba(33, 150, 243, 0.22);
+        }
+
+        .dialog-toggle-row.checked {
+            background: #e8f5e9;
+            border-color: #81c784;
+        }
+
+        .dialog-toggle-row.disabled {
+            cursor: not-allowed;
+            opacity: 0.72;
+        }
+
+        .dialog-toggle-row.compact {
+            min-height: 32px;
+            padding: 2px 10px;
+        }
+
+        .dialog-toggle-row.compact .dialog-toggle-switch {
+            --dialog-toggle-width: 42px;
+            --dialog-toggle-height: 20px;
+            --dialog-toggle-offset: 2px;
+            --dialog-toggle-thumb-size: 14px;
+        }
+
+        .dialog-toggle-label-group {
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+            flex: 1 1 auto;
+            min-width: 0;
+            overflow: hidden;
+        }
+
+        .dialog-toggle-label {
+            display: block;
+            font-size: 13px;
+            font-weight: 700;
+            color: #455a64;
+            user-select: none;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            transition: color 0.15s ease;
+        }
+
+        .dialog-toggle-description {
+            display: block;
+            font-size: 12px;
+            color: #607d8b;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            transition: color 0.15s ease;
+        }
+
+        .dialog-toggle-right {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            flex: 0 0 auto;
+        }
+
+        .dialog-toggle-row.checked .dialog-toggle-label,
+        .dialog-toggle-row.checked .dialog-toggle-description {
+            color: #2e7d32;
+        }
+
+        label {
+            @include button-font;
+
+            user-select: none;
+            white-space: nowrap;
+
+            background: #eeeeee;
+            color: #000000;
+
+            border-radius: 4px;
+            padding-left: 8px;
+            padding-right: 8px;
+            padding-right: 0;
+
+            display: flex;
+            flex-direction: row;
+            flex-wrap: nowrap;
+            align-items: center;
+            gap: 4px;
+
+            input[type="checkbox"] {
+                width: 24px;
+            }
+
+            input:not([type="checkbox"]),
+            select {
+                border-top-left-radius: 16px;
+                border-bottom-left-radius: 16px;
+                height: 100%;
+            }
+        }
+
+        .dialog-toggle-switch {
+            --dialog-toggle-width: 46px;
+            --dialog-toggle-height: 26px;
+            --dialog-toggle-offset: 2px;
+            --dialog-toggle-thumb-size: 20px;
+
+            position: relative;
+            display: inline-flex;
+            align-items: center;
+            justify-content: flex-start;
+            width: var(--dialog-toggle-width);
+            min-width: var(--dialog-toggle-width);
+            height: var(--dialog-toggle-height);
+            min-height: var(--dialog-toggle-height);
+            flex: 0 0 auto;
+            margin: 0;
+            border-radius: 999px;
+            background: transparent;
+            padding: 0;
+            border: none;
+        }
+
+        .dialog-toggle-switch .dialog-toggle-switch-track {
+            position: absolute;
+            inset: 0;
+            border-radius: 999px;
+            background: #90a4ae;
+            border: 1px solid #78909c;
+            box-sizing: border-box;
+            overflow: hidden;
+            transition: background 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease;
+
+            &::before {
+                content: '';
+                position: absolute;
+                top: var(--dialog-toggle-offset);
+                left: var(--dialog-toggle-offset);
+                width: var(--dialog-toggle-thumb-size);
+                height: var(--dialog-toggle-thumb-size);
+                border-radius: 50%;
+                background: #fff;
+                box-shadow: 0 1px 2px rgba(38, 50, 56, 0.24);
+                transition: left 0.18s ease;
+            }
+        }
+
+        .dialog-toggle-switch.checked .dialog-toggle-switch-track {
+            background: #43a047;
+            border-color: #388e3c;
+        }
+
+        .dialog-toggle-switch.checked .dialog-toggle-switch-track::before {
+            left: calc(100% - var(--dialog-toggle-offset) - var(--dialog-toggle-thumb-size));
+        }
+
+        .dialog-toggle-row:focus-visible .dialog-toggle-switch-track {
+            box-shadow: 0 0 0 3px rgba(33, 150, 243, 0.28);
+        }
+
+        .dialog-toggle-row.disabled .dialog-toggle-switch-track {
+            opacity: 0.6;
+        }
+
+        .dialog-toggle-row.disabled .dialog-toggle-switch-track::before {
+            box-shadow: 0 1px 2px rgba(38, 50, 56, 0.2);
+        }
+
+        input:not([type="checkbox"]),
+        select,
+        textarea {
+            border-radius: 4px;
+            border: none;
+            padding: 0 8px;
+            text-overflow: ellipsis;
+            outline: none;
+            color: #000;
+            width: 100%;
+        }
+
+        // Common section styles for dialog content
+        .section {
+            --section-accent-color: #455a64;
+            --section-bg-color: #f9f9f9;
+            --section-border-color: #e0e0e0;
+
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            padding: 12px;
+            background: var(--section-bg-color);
+            border: 1px solid var(--section-border-color);
+            border-radius: 8px;
+
+            >.section-header {
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                gap: 8px;
+
+                &.collapsable {
+                    cursor: pointer;
+                    user-select: none;
+                    border-radius: 6px;
+                    outline: none;
+
+                    &:hover .section-collapse-button {
+                        background: #dfe5e8;
+                        color: #455a64;
+                    }
+
+                    &:active .section-collapse-button {
+                        background: #cfd8dc;
+                        transform: translateY(1px);
+                    }
+
+                    &:focus-visible {
+                        box-shadow: 0 0 0 2px rgba(33, 150, 243, 0.24);
+                    }
+                }
+
+                h2,
+                h3 {
+                    font-size: 14px;
+                    font-weight: 600;
+                    margin: 0;
+                }
+
+                .section-collapse-button {
+                    border: 1px solid #cfd8dc;
+                    border-radius: 50%;
+                    background: #eceff1;
+                    color: #607d8b;
+                    width: 24px;
+                    min-width: 24px;
+                    height: 24px;
+                    min-height: 24px;
+                    padding: 0;
+                    display: inline-flex;
+                    align-items: center;
+                    justify-content: center;
+                    line-height: 1;
+                    transition: background 0.15s ease, color 0.15s ease, transform 0.15s ease;
+
+                    .material-icons {
+                        font-size: 16px;
+                    }
+                }
+            }
+
+            >.section-content {
+                display: flex;
+                flex-direction: column;
+                gap: 12px;
+            }
+        }
+
+        .section-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 8px;
+
+            h2,
+            h3 {
+                font-size: 14px;
+                font-weight: 600;
+                color: #333;
+                margin: 0;
+            }
+        }
+
+        .section-description {
+            margin: 0;
+            font-size: 12px;
+            color: #666;
+        }
+
+        .subsection {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            padding: 10px;
+            background: #fff;
+            border: 1px solid #e5e5e5;
+            border-radius: 6px;
+        }
+
+        // Chips container and chip styles
+        .chips-container {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .chips {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+            align-items: center;
+        }
+
+        .chip {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            padding: 5px 10px;
+            background: #fff;
+            border: 1px solid #d0d0d0;
+            border-radius: 16px;
+            transition: all 0.15s ease;
+            max-width: 200px;
+
+            .chip-name {
+                font-family: monospace;
+                font-size: 12px;
+                color: #333;
+                overflow: hidden;
+                text-overflow: ellipsis;
+                white-space: nowrap;
+            }
+
+            .chip-actions {
+                display: flex;
+                gap: 2px;
+                flex-shrink: 0;
+            }
+
+            .chip-action-btn {
+                background: transparent;
+                border: none;
+                padding: 0;
+                width: 18px;
+                height: 18px;
+                border-radius: 50%;
+                cursor: pointer;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                transition: all 0.15s ease;
+                flex-shrink: 0;
+
+                .icon {
+                    font-size: 14px;
+                    color: #888;
+                }
+
+                &:hover {
+                    background: rgba(0, 0, 0, 0.1);
+
+                    .icon {
+                        color: #d32f2f;
+                    }
+                }
+            }
+
+            &.default {
+                border-width: 2px;
+                font-weight: 500;
+
+                .chip-name::before {
+                    font-family: "Material Symbols Outlined";
+                    font-variation-settings: "FILL" 1, "GRAD" 0, "opsz" 24;
+                    content: 'star';
+                    font-size: 10px;
+                    opacity: 0.7;
+                    margin-right: 4px;
+                }
+            }
+
+            &.selectable {
+                cursor: pointer;
+
+                &:hover {
+                    background: #f5f5f5;
+                    border-color: #999;
+                }
+
+                &.selected {
+                    background: #1976d2;
+                    border-color: #1565c0;
+
+                    .chip-name {
+                        color: #fff;
+                    }
+
+                    .chip-action-btn .icon {
+                        color: rgba(255, 255, 255, 0.8);
+                    }
+
+                    .chip-action-btn:hover .icon {
+                        color: #fff;
+                    }
+                }
+            }
+        }
+
+        button.add-chip-btn {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 28px;
+            height: 28px;
+            padding: 0;
+            background: transparent;
+            border: 1px dashed #90caf9;
+            border-radius: 50%;
+            cursor: pointer;
+            transition: all 0.15s ease;
+
+            .icon {
+                font-size: 18px;
+                color: #1976d2;
+            }
+
+            &:hover {
+                background: #e3f2fd;
+                border-style: solid;
+            }
+        }
+
+        .add-chip-input-container {
+            display: flex;
+            align-items: center;
+
+            .add-chip-input {
+                font-family: monospace;
+                font-size: 12px;
+                padding: 5px 12px;
+                border: 1px solid #90caf9;
+                border-radius: 16px;
+                outline: none;
+                min-width: 150px;
+                background: #fff;
+                height: 28px;
+                box-sizing: border-box;
+                box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+                transition: all 0.15s ease;
+
+                &::placeholder {
+                    color: #aaa;
+                }
+
+                &:focus {
+                    border-color: #1976d2;
+                    box-shadow: 0 0 0 2px rgba(25, 118, 210, 0.15);
+                }
+            }
+        }
+
+        // Small button variant
+        button.small {
+            min-height: unset;
+            height: 28px;
+            width: 28px;
+            padding: 4px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+
+            .icon {
+                font-size: 18px;
+            }
+        }
+    }
+}
+
+.dialog-action-button {
+    @include dialog-action-button-style;
+}
+
+
+
+// Dialog animations
+@keyframes dialog-fade-in {
+    from {
+        opacity: 0;
+    }
+
+    to {
+        opacity: 1;
+    }
+}
+
+@keyframes dialog-fade-out {
+    from {
+        opacity: 1;
+    }
+
+    to {
+        opacity: 0;
+    }
+}
+
+@keyframes dialog-scale-in {
+    from {
+        opacity: 0;
+        transform: scale(0.95) translateY(10px);
+    }
+
+    to {
+        opacity: 1;
+        transform: scale(1) translateY(0);
+    }
+}
+
+@keyframes dialog-scale-out {
+    from {
+        opacity: 1;
+        transform: scale(1) translateY(0);
+    }
+
+    to {
+        opacity: 0;
+        transform: scale(0.95) translateY(10px);
+    }
+}

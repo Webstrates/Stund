@@ -1,0 +1,48 @@
+{
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "description": "Schema for document text changed event. This is a duration event that tracks text changes in document fragments, batching rapid edits into a single event that ends after 1500ms of inactivity.",
+    "type": "object",
+    "properties": {
+        "shapeId": {
+            "type": "string",
+            "description": "The unique identifier of the document shape being edited"
+        },
+        "documentFragmentId": {
+            "type": "string",
+            "description": "The fragment identifier backing the edited document"
+        },
+        "documentName": {
+            "type": "string",
+            "description": "The resolved display name of the edited document"
+        },
+        "editSource": {
+            "type": "string",
+            "enum": [
+                "canvas",
+                "fullscreen"
+            ],
+            "description": "Where the document edit was performed"
+        },
+        "textStart": {
+            "type": "string",
+            "description": "The document text at the start of the tracked editing session"
+        },
+        "textEnd": {
+            "type": "string",
+            "description": "The document text at the end of the tracked editing session"
+        },
+        "reason": {
+            "type": "string",
+            "description": "Optional reason for ending the text change event (e.g., 'edit-mode-exit', 'deleted', 'cleanup')"
+        }
+    },
+    "required": [
+        "shapeId",
+        "documentFragmentId",
+        "documentName",
+        "editSource",
+        "textStart",
+        "textEnd"
+    ],
+    "additionalProperties": false
+}

@@ -1,0 +1,56 @@
+@import url('https://ga.jspm.io/npm:tldraw@5.3.0/tldraw.css');
+
+#app-root .tldraw-canvas {
+    display: block;
+    inset: 0;
+    z-index: 10;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    flex: 3 1 auto;
+
+    .tlui-layout {
+        transition: margin-right 0.25s ease;
+        margin-right: var(--sidebar-width);
+    }
+
+    .tl-watermark_SEE-LICENSE {
+
+        background-color: rgb(237, 240, 242);
+        border-radius: 6px;
+        padding: 4px;
+
+        &:before {
+            text-align: center;
+            font-size: 11px;
+            font-weight: 600;
+            content: "Made with tldraw";
+        }
+
+        button {
+            display: none;
+        }
+    }
+
+    &.tldraw-migration-status {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 12px;
+        padding: 24px;
+        background: #FAFAFA;
+        color: #424242;
+
+        &.error {
+            align-items: flex-start;
+            background: #FFEBEE;
+            color: #B71C1C;
+
+            p {
+                margin: 8px 0 0;
+                max-width: 640px;
+            }
+        }
+    }
+}

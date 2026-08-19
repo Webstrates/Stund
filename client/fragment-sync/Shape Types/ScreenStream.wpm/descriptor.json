@@ -1,0 +1,9 @@
+{
+    "description": "Stream component for screen streams.",
+    "dependencies": [
+        "#MediaStreamShapeFactory",
+        "#ScreenStreamManager"
+    ],
+    "assets": [],
+    "version": "0.1.0"
+}

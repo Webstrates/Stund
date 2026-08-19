@@ -1,0 +1,104 @@
+{
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "description": "Schema for a finalized chat entry instant event.",
+    "type": "object",
+    "properties": {
+        "chatId": {
+            "type": "string",
+            "description": "The chat/tab identifier that produced the entry."
+        },
+        "chatShared": {
+            "type": "boolean",
+            "description": "Whether the entry came from a shared (persisted) chat."
+        },
+        "entryId": {
+            "type": "string",
+            "description": "The unique identifier of the chat entry."
+        },
+        "entryIndex": {
+            "type": "integer",
+            "description": "Index of this entry within the chat for ordering (1-based)."
+        },
+        "type": {
+            "type": "string",
+            "description": "The entry role/type (for example 'user' or 'assistant')."
+        },
+        "status": {
+            "type": "string",
+            "enum": [
+                "completed",
+                "cancelled",
+                "exception"
+            ],
+            "description": "Final status of the entry."
+        },
+        "author": {
+            "type": "string",
+            "description": "Display author of the chat entry."
+        },
+        "content": {
+            "type": "string",
+            "description": "The finalized entry content."
+        },
+        "imageContext": {
+            "type": "array",
+            "description": "Image attachments associated with the chat entry.",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "string",
+                        "description": "Stable image identifier within the entry."
+                    },
+                    "name": {
+                        "type": "string",
+                        "description": "Display name of the attached image."
+                    },
+                    "mimeType": {
+                        "type": "string",
+                        "description": "MIME type for the image data."
+                    },
+                    "sizeBytes": {
+                        "type": [
+                            "integer",
+                            "null"
+                        ],
+                        "description": "Optional image size in bytes."
+                    }
+                },
+                "required": [
+                    "id",
+                    "name",
+                    "mimeType",
+                    "sizeBytes"
+                ],
+                "additionalProperties": false
+            }
+        },
+        "shapeContext": {
+            "type": "array",
+            "description": "Shape attachments associated with the chat entry.",
+            "items": {
+                "$ref": "shape.json"
+            }
+        },
+        "stepCount": {
+            "type": "integer",
+            "description": "Number of execution steps emitted for this entry."
+        }
+    },
+    "required": [
+        "chatId",
+        "chatShared",
+        "entryId",
+        "entryIndex",
+        "type",
+        "status",
+        "author",
+        "content",
+        "imageContext",
+        "shapeContext",
+        "stepCount"
+    ],
+    "additionalProperties": false
+}

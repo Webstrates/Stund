@@ -1,0 +1,11 @@
+{
+    "description": "Model Manager for configuring AI models used by experts and widgets",
+    "dependencies": [
+        "#App",
+        "#CoreHelpers",
+        "#Dialog",
+        "#SlopScript"
+    ],
+    "assets": [],
+    "version": "0.1.0"
+}

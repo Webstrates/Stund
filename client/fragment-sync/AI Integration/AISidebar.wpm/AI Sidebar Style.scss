@@ -1,0 +1,305 @@
+.ai-sidebar {
+    -webkit-backdrop-filter: blur(16px);
+    backdrop-filter: blur(16px);
+    background: rgba(250, 250, 250, 0.6) !important;
+    position: absolute;
+    top: 0;
+    right: 48px;
+    bottom: 0;
+    width: 100%;
+
+    z-index: 20;
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    justify-content: flex-start;
+    border-left: 2px solid rgba(0, 0, 0, 0.05);
+    box-shadow: inset 2px 0 24px rgba(255, 255, 255, 0.2);
+
+    // Animation properties
+    max-width: var(--sidebar-width, 400px);
+    opacity: 1;
+    transition: width 0.25s ease, max-width 0.25s ease, opacity 0.2s ease, box-shadow 0.25s ease;
+    overflow: hidden;
+
+    .ai-sidebar-tabs {
+        display: flex;
+        flex-direction: column;
+        flex-shrink: 0;
+        border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+        background: rgba(255, 255, 255, 0.5);
+        max-height: 200px;
+        overflow-y: auto;
+
+        .tab-region {
+            display: flex;
+            flex-direction: column;
+
+            &:not(:last-child) {
+                border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+            }
+
+            .tab-region-header {
+                display: flex;
+                align-items: center;
+                gap: 6px;
+                padding: 8px 12px;
+                font-size: 11px;
+                font-weight: 600;
+                text-transform: uppercase;
+                letter-spacing: 0.5px;
+                color: rgba(0, 0, 0, 0.5);
+                background: rgba(0, 0, 0, 0.02);
+
+                .material-icons {
+                    font-size: 14px;
+                }
+
+                .tab-region-title {
+                    flex: 1;
+                }
+
+                .add-tab-button {
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    width: 20px;
+                    height: 20px;
+                    border: none;
+                    background: rgba(99, 0, 238, 0.1);
+                    border-radius: 4px;
+                    cursor: pointer;
+                    transition: background 0.15s ease;
+
+                    .material-icons {
+                        font-size: 14px;
+                        color: rgba(99, 0, 238, 0.8);
+                    }
+
+                    &:hover {
+                        background: rgba(99, 0, 238, 0.2);
+                    }
+                }
+            }
+
+            .tab-list {
+                display: flex;
+                flex-direction: column;
+                gap: 2px;
+                padding: 4px 8px 8px;
+
+                .no-tabs-message {
+                    font-size: 11px;
+                    color: rgba(0, 0, 0, 0.4);
+                    font-style: italic;
+                    padding: 6px 8px;
+                    height: 18px;
+                    line-height: 18px;
+                }
+
+                .chat-tab {
+                    display: flex;
+                    align-items: center;
+                    padding: 6px 8px;
+                    border-radius: 6px;
+                    cursor: pointer;
+                    background: rgba(0, 0, 0, 0.03);
+                    transition: background 0.15s ease;
+
+                    .tab-name {
+                        flex: 1;
+                        font-size: 12px;
+                        color: rgba(0, 0, 0, 0.7);
+                        overflow: hidden;
+                        text-overflow: ellipsis;
+                        white-space: nowrap;
+                    }
+
+                    .tab-close {
+                        display: flex;
+                        align-items: center;
+                        justify-content: center;
+                        width: 18px;
+                        height: 18px;
+                        border: none;
+                        background: transparent;
+                        border-radius: 4px;
+                        cursor: pointer;
+                        opacity: 0;
+                        transition: opacity 0.15s ease, background 0.15s ease;
+
+                        .material-icons {
+                            font-size: 14px;
+                            color: rgba(0, 0, 0, 0.5);
+                        }
+
+                        &:hover {
+                            background: rgba(0, 0, 0, 0.1);
+                        }
+                    }
+
+                    &:hover {
+                        background: rgba(0, 0, 0, 0.06);
+
+                        .tab-close {
+                            opacity: 1;
+                        }
+                    }
+
+                    &.active {
+                        background: rgba(99, 0, 238, 0.1);
+
+                        .tab-name {
+                            color: rgba(99, 0, 238, 0.9);
+                            font-weight: 500;
+                        }
+
+                        .tab-close {
+                            opacity: 0.7;
+
+                            .material-icons {
+                                color: rgba(99, 0, 238, 0.7);
+                            }
+                        }
+                    }
+
+                    &.processing {
+                        .processing-indicator {
+                            margin-right: 6px;
+                            display: flex;
+                            align-items: center;
+                            justify-content: center;
+                            color: rgba(99, 0, 238, 0.7);
+
+                            .spinnerCircle {
+                                width: 12px;
+                                height: 12px;
+                                border-radius: 50%;
+                                border: 2px solid rgba(99, 0, 238, 0.22);
+                                border-top-color: currentColor;
+                                animation: process-step-spin 0.9s linear infinite;
+                            }
+                        }
+
+                        &.remote {
+                            .processing-indicator {
+                                color: rgba(0, 150, 136, 0.7);
+
+                                .spinnerCircle {
+                                    border-color: rgba(0, 150, 136, 0.22);
+                                    border-top-color: currentColor;
+                                }
+                            }
+
+                            .tab-name {
+                                color: rgba(0, 150, 136, 0.8);
+                            }
+                        }
+                    }
+
+                    .active-users {
+                        display: flex;
+                        align-items: center;
+                        gap: 2px;
+                        margin-right: 6px;
+                        flex-shrink: 0;
+
+                        .user-indicator {
+                            display: flex;
+                            align-items: center;
+                            justify-content: center;
+                            width: 18px;
+                            height: 18px;
+                            border-radius: 50%;
+                            background: rgba(99, 0, 238, 0.15);
+                            color: rgba(99, 0, 238, 0.8);
+                            font-size: 10px;
+                            font-weight: 600;
+                            cursor: default;
+                            transition: transform 0.15s ease, background 0.15s ease;
+
+                            &:hover {
+                                transform: scale(1.1);
+                                background: rgba(99, 0, 238, 0.25);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    @keyframes process-step-spin {
+        to {
+            transform: rotate(360deg);
+        }
+    }
+
+    .ai-sidebar-chat {
+        display: flex;
+        flex-direction: column;
+        flex: 1;
+        width: 100%;
+        min-height: 0;
+        overflow: hidden;
+    }
+
+    .no-active-chat {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        height: 100%;
+        color: rgba(0, 0, 0, 0.4);
+        text-align: center;
+        padding: 24px;
+
+        .material-icons {
+            font-size: 48px;
+            margin-bottom: 16px;
+            opacity: 0.5;
+        }
+
+        p {
+            margin: 4px 0;
+            font-size: 13px;
+
+            &:first-of-type {
+                font-weight: 500;
+                font-size: 14px;
+            }
+        }
+    }
+
+    .ai-sidebar-resize-handle {
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 6px;
+        height: 100%;
+        cursor: col-resize;
+        background: transparent;
+        z-index: 20;
+        transition: background 0.2s ease;
+
+        &:hover {
+            background: rgba(99, 0, 238, 0.3);
+        }
+    }
+
+    &.minimized {
+        max-width: 0;
+        opacity: 0;
+        box-shadow: none;
+        pointer-events: none;
+    }
+
+    &.resizing {
+        user-select: none;
+        transition: none;
+
+        .ai-sidebar-resize-handle {
+            background: rgba(99, 0, 238, 0.5);
+        }
+    }
+}

@@ -1,0 +1,18 @@
+{
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "description": "Schema for the state event that captures all shapes in a canvas.",
+    "type": "object",
+    "properties": {
+        "shapes": {
+            "type": "array",
+            "description": "Array of all shapes currently on the canvas",
+            "items": {
+                "$ref": "shape.json"
+            }
+        }
+    },
+    "required": [
+        "shapes"
+    ],
+    "additionalProperties": false
+}

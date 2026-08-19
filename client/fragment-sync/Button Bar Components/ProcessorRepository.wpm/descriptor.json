@@ -1,0 +1,8 @@
+{
+    "description": "Processor repository management and installation interface.",
+    "dependencies": [
+        "#FragmentRepository"
+    ],
+    "assets": [],
+    "version": "0.1.0"
+}

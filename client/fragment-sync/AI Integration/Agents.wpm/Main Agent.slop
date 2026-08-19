@@ -1,0 +1,710 @@
+import { createConnector } from '#SlopScript .connector-factory';
+import { getModel } from '#ModelManager .default';
+
+import { CanvasExpert } from '#canvas-expert-slop';
+import { HistoryModelExpert } from '#history-model-expert-slop';
+import { SearchExpert } from '#search-expert-slop';
+import { WidgetExpert } from '#widget-expert-slop';
+import { ProcessorExpert } from '#processor-expert-slop';
+
+
+
+const MAX_TOKENS_CODING = 16384;
+
+export class MainAgent {
+    static TOOL_GROUPS = {
+        search: {
+            name: 'Web Search',
+            description: 'Access to the search expert for web and internet information',
+            icon: 'language',
+            enabled: true,
+            alwaysEnabled: true,
+            tools: ['askSearchExpert']
+        },
+        canvasRead: {
+            name: 'Canvas (Read)',
+            description: 'Access to the canvas expert for reading shapes and canvas state',
+            icon: 'visibility', // developer_board
+            enabled: true,
+            alwaysEnabled: true,
+            tools: ['askCanvasExpert']
+        },
+        canvasWrite: {
+            name: 'Canvas (Write)',
+            description: 'Access to the canvas expert for modifying shapes and canvas state',
+            icon: 'app_registration',
+            enabled: false,
+            tools: ['askCanvasExpertForChanges']
+        },
+        history: {
+            name: 'History Model',
+            description: 'Access to the history model expert',
+            icon: 'schedule', // history
+            enabled: true,
+            alwaysEnabled: true,
+            tools: ['askHistoryModelExpert']
+        },
+        widgets: {
+            name: 'Widgets',
+            description: 'Access to the widget expert for modifying widgets',
+            icon: 'widgets',
+            enabled: false,
+            tools: ['askWidgetExpert']
+        },
+        processors: {
+            name: 'Processors',
+            description: 'Access to the processor expert for creating and editing processor fragments',
+            icon: 'conversion_path',
+            enabled: false,
+            tools: ['askProcessorExpert']
+        }
+    };
+
+    constructor() {
+        this.searchExpert = new SearchExpert();
+        this.canvasExpert = new CanvasExpert();
+        this.historyModelExpert = new HistoryModelExpert();
+        this.widgetExpert = new WidgetExpert();
+        this.processorExpert = new ProcessorExpert();
+    }
+
+    // Get tool groups configuration for UI
+    getToolGroups() {
+        return Object.entries(MainAgent.TOOL_GROUPS).map(([key, group]) => ({
+            key,
+            name: group.name,
+            icon: group.icon,
+            description: group.description,
+            enabled: group.enabled,
+            alwaysEnabled: Boolean(group.alwaysEnabled)
+        }));
+    }
+
+    getActiveToolGroupSet(activeToolGroupIds = null) {
+        const alwaysEnabledGroups = Object.entries(MainAgent.TOOL_GROUPS)
+            .filter(([, group]) => Boolean(group.alwaysEnabled))
+            .map(([groupKey]) => groupKey);
+
+        if (Array.isArray(activeToolGroupIds)) {
+            const activeToolGroups = new Set(activeToolGroupIds);
+            alwaysEnabledGroups.forEach((groupKey) => activeToolGroups.add(groupKey));
+            return activeToolGroups;
+        }
+
+        const defaultEnabledGroups = Object.entries(MainAgent.TOOL_GROUPS)
+            .filter(([, group]) => group.enabled)
+            .map(([groupKey]) => groupKey);
+        const activeToolGroups = new Set(defaultEnabledGroups);
+        alwaysEnabledGroups.forEach((groupKey) => activeToolGroups.add(groupKey));
+        return activeToolGroups;
+    }
+
+    getAvailableToolGroupStatus(activeToolGroupIds = null) {
+        const activeToolGroupSet = this.getActiveToolGroupSet(activeToolGroupIds);
+        const result = {};
+        for (const [key, group] of Object.entries(MainAgent.TOOL_GROUPS)) {
+            result[key] = {
+                name: group.name,
+                description: group.description,
+                enabled: activeToolGroupSet.has(key)
+            };
+        }
+        return result;
+    }
+
+
+    getEnabledTools(activeToolGroupIds = null) {
+        const activeToolGroupSet = this.getActiveToolGroupSet(activeToolGroupIds);
+        const enabledTools = [];
+        for (const [key, group] of Object.entries(MainAgent.TOOL_GROUPS)) {
+            if (activeToolGroupSet.has(key)) {
+                for (const toolName of group.tools) {
+                    enabledTools.push(this[toolName]);
+                }
+            }
+        }
+        return enabledTools;
+    }
+
+
+
+    @Tool({
+        description: 'Asks a question to the tldraw canvas expert and gets an answer. Read-only access.',
+        parameters: {
+            type: 'object',
+            properties: {
+                question: {
+                    type: 'string',
+                    description: 'The question to ask the tldraw canvas expert.'
+                },
+                shapeContext: {
+                    type: 'array',
+                    description: 'Optional shape context to provide to the canvas expert.',
+                    items: { type: 'shape' }
+                }
+            },
+            required: ['question'],
+            additionalProperties: false
+        },
+        returns: {
+            type: 'object',
+            properties: {
+                content: {
+                    type: 'string',
+                    description: 'User-facing plain text answer from the canvas expert.'
+                },
+                shapeContext: {
+                    type: 'array',
+                    description: 'Optional shape context returned by the canvas expert for machine use.',
+                    items: { type: 'shape' }
+                }
+            },
+            required: ['content'],
+            additionalProperties: false
+        }
+    })
+    async askCanvasExpert(question, shapeContext = []) {
+        const model = getModel('canvas-expert');
+
+        if (model === this.connector?.model) {
+            this.canvasExpert.connector = this.connector;
+            return await this.canvasExpert.ask(question, shapeContext, false);
+        } else {
+            const connection = createConnector(model);
+            // Share the connector stack from parent connector for proper nesting
+            connection.connectorStack = this.connector.connectorStack;
+            this.canvasExpert.connector = connection;
+            return await connection.run(async () => {
+                return await this.canvasExpert.ask(question, shapeContext, false);
+            });
+        }
+    }
+
+    @Tool({
+        description: 'Asks a question to the tldraw canvas expert and gets an answer. Write access enabled.',
+        parameters: {
+            type: 'object',
+            properties: {
+                question: {
+                    type: 'string',
+                    description: 'The question to ask the tldraw canvas expert.'
+                },
+                shapeContext: {
+                    type: 'array',
+                    description: 'Optional shape context to provide to the canvas expert.',
+                    items: { type: 'shape' }
+                }
+            },
+            required: ['question'],
+            additionalProperties: false
+        },
+        returns: {
+            type: 'object',
+            properties: {
+                content: {
+                    type: 'string',
+                    description: 'User-facing plain text answer from the canvas expert.'
+                },
+                shapeContext: {
+                    type: 'array',
+                    description: 'Optional shape context returned by the canvas expert for machine use.',
+                    items: { type: 'shape' }
+                }
+            },
+            required: ['content'],
+            additionalProperties: false
+        }
+    })
+    async askCanvasExpertForChanges(question, shapeContext = []) {
+        const model = getModel('canvas-expert');
+
+        if (model === this.connector?.model) {
+            this.canvasExpert.connector = this.connector;
+            return await this.canvasExpert.ask(question, shapeContext, true);
+        } else {
+            const connection = createConnector(model);
+            // Share the connector stack from parent connector for proper nesting
+            connection.connectorStack = this.connector.connectorStack;
+            this.canvasExpert.connector = connection;
+            return await connection.run(async () => {
+                return await this.canvasExpert.ask(question, shapeContext, true);
+            });
+        }
+    }
+
+    @Tool({
+        description: 'Asks a question to the history model expert and gets an answer.',
+        parameters: {
+            type: 'object',
+            properties: {
+                question: {
+                    type: 'string',
+                    description: 'The question to ask the history model expert.'
+                },
+                shapeContext: {
+                    type: 'array',
+                    description: 'Optional shape context to provide to the history model expert.',
+                    items: { type: 'shape' }
+                }
+            },
+            required: ['question'],
+            additionalProperties: false
+        },
+        returns: {
+            type: 'object',
+            properties: {
+                content: {
+                    type: 'string',
+                    description: 'User-facing plain text answer from the history model expert.'
+                },
+                shapeContext: {
+                    type: 'array',
+                    description: 'Optional shape context returned by the history model expert for machine use.',
+                    items: { type: 'shape' }
+                }
+            },
+            required: ['content'],
+            additionalProperties: false
+        }
+    })
+    async askHistoryModelExpert(question, shapeContext = []) {
+        const model = getModel('history-model-expert');
+
+        if (model === this.connector?.model) {
+            this.historyModelExpert.connector = this.connector;
+            return await this.historyModelExpert.ask(question, shapeContext);
+        } else {
+            const connection = createConnector(model);
+            // Share the connector stack from parent connector for proper nesting
+            connection.connectorStack = this.connector.connectorStack;
+            this.historyModelExpert.connector = connection;
+            return await connection.run(async () => {
+                return await this.historyModelExpert.ask(question, shapeContext);
+            });
+        }
+
+    }
+
+    @Tool({
+        description: 'Asks a question to the search expert and gets an answer.',
+        parameters: {
+            type: 'object',
+            properties: {
+                question: {
+                    type: 'string',
+                    description: 'The question to ask the search expert.'
+                }
+            },
+            required: ['question'],
+            additionalProperties: false
+        },
+        returns: { type: 'string' }
+    })
+    async askSearchExpert(question) {
+        const model = getModel('search-expert');
+
+        if (model === this.connector?.model) {
+            this.searchExpert.connector = this.connector;
+            return await this.searchExpert.ask(question);
+        } else {
+            const connection = createConnector(model);
+            // Share the connector stack from parent connector for proper nesting
+            connection.connectorStack = this.connector.connectorStack;
+            this.searchExpert.connector = connection;
+            return await connection.run(async () => {
+                return await this.searchExpert.ask(question);
+            });
+        }
+    }
+
+    @Tool({
+        description: 'Asks a question to the widget expert and gets an answer.',
+        parameters: {
+            type: 'object',
+            properties: {
+                question: {
+                    type: 'string',
+                    description: 'The question to ask the widget expert.'
+                },
+                shapeContext: {
+                    type: 'array',
+                    description: 'Optional shape context to provide to the widget expert.',
+                    items: { type: 'shape' }
+                }
+            },
+            required: ['question'],
+            additionalProperties: false
+        },
+        returns: {
+            type: 'object',
+            properties: {
+                content: {
+                    type: 'string',
+                    description: 'User-facing plain text answer from the widget expert.'
+                },
+                shapeContext: {
+                    type: 'array',
+                    description: 'Optional shape context returned by the widget expert for machine use.',
+                    items: { type: 'shape' }
+                }
+            },
+            required: ['content'],
+            additionalProperties: false
+        }
+    })
+    async askWidgetExpert(question, shapeContext = []) {
+        // Use bigger token limit for widget expert
+        const model = getModel('widget-expert');
+        const connection = createConnector(model, { max_tokens: MAX_TOKENS_CODING });
+        // Share the connector stack from parent connector for proper nesting
+        connection.connectorStack = this.connector.connectorStack;
+        this.widgetExpert.connector = connection;
+        return await connection.run(async () => {
+            return await this.widgetExpert.ask(question, shapeContext);
+        });
+    }
+
+    @Tool({
+        description: 'Asks a question to the processor expert and gets an answer.',
+        parameters: {
+            type: 'object',
+            properties: {
+                question: {
+                    type: 'string',
+                    description: 'The question to ask the processor expert.'
+                }
+            },
+            required: ['question'],
+            additionalProperties: false
+        },
+        returns: { type: 'string' }
+    })
+    async askProcessorExpert(question) {
+        // Use bigger token limit for processor expert
+        const model = getModel('processor-expert');
+        const connection = createConnector(model, { max_tokens: MAX_TOKENS_CODING });
+        // Share the connector stack from parent connector for proper nesting
+        connection.connectorStack = this.connector.connectorStack;
+        this.processorExpert.connector = connection;
+        return await connection.run(async () => {
+            return await this.processorExpert.ask(question);
+        });
+    }
+
+
+
+    async prompt(messages, activeToolGroupIds = null, imageContext = [], shapeContext = []) {
+        this.searchExpert = new SearchExpert();
+        this.canvasExpert = new CanvasExpert();
+        this.historyModelExpert = new HistoryModelExpert();
+        this.widgetExpert = new WidgetExpert();
+        this.processorExpert = new ProcessorExpert();
+
+        const availableToolGroups = this.getAvailableToolGroupStatus(activeToolGroupIds);
+        const enabledTools = this.getEnabledTools(activeToolGroupIds);
+
+        const reply = await this.promptSlop(
+            messages,
+            availableToolGroups,
+            imageContext,
+            shapeContext,
+            ...enabledTools
+        );
+
+        return reply;
+    }
+
+    @Slop({
+        parameters: {
+            type: 'object',
+            properties: {
+                messages: {
+                    type: 'array',
+                    items: { type: 'object' },
+                    description: 'The messages in the conversation.'
+                },
+                availableToolGroups: {
+                    type: 'object',
+                    description: 'The available tool groups for this session.'
+                },
+                imageContext: {
+                    type: 'array',
+                    description: 'Optional image context supplied by the user for this prompt.',
+                    items: { type: 'image' }
+                },
+                shapeContext: {
+                    type: 'array',
+                    description: 'Optional shape context supplied by the user for this prompt.',
+                    items: { type: 'shape' }
+                }
+            },
+            required: ['messages', 'availableToolGroups', 'imageContext', 'shapeContext'],
+            additionalProperties: false
+        },
+        returns: {
+            type: 'object',
+            properties: {
+                content: {
+                    type: 'string',
+                    description: 'User-facing plain text answer.'
+                },
+                shapeContext: {
+                    type: 'array',
+                    description: 'Optional shape context to attach to the assistant reply.',
+                    items: { type: 'shape' }
+                }
+            },
+            required: ['content'],
+            additionalProperties: false
+        }
+    })
+    promptSlop(messages, availableToolGroups, imageContext, shapeContext) {
+        `You are an assistant for a collaborative meeting application that provides a shared canvas and a history model of the meeting. You orchestrate between specialized experts to help the user with their prompts.
+
+
+
+# Your Role
+
+You are the main agent. Your role is to:
+
+1. Understand what the user is asking
+2. Route prompts to the appropriate expert(s)
+3. Synthesize responses into clear and helpful answers
+
+
+## Input
+
+You will receive user prompts as an array of messages, where each message has a "role" (either "user" or "assistant") and "content" (the text of the message). The latest user message is the main prompt you need to respond to.
+
+You may also receive an "imageContext" argument with one or more user-provided images relevant to the latest prompt.
+When imageContext is present:
+- Treat the images as high-priority context for interpreting the latest user request
+- Use the image details in your reasoning before delegating to experts
+- Mention uncertainty when image evidence is ambiguous
+
+You may also receive a "shapeContext" argument with one or more selected canvas shapes relevant to the latest prompt.
+When shapeContext is present:
+- Treat the selected shapes as high-priority context for interpreting the latest user request
+- Use shape IDs, types, positions, and properties in your reasoning before delegating to experts
+- For image shapes, use the attached image evidence in addition to the shape JSON
+
+
+## Output
+
+### content
+
+- Always set content to plain text only; no markdown, code blocks, or special formatting unless the user specifically requests it
+- Be concise and clear in your responses
+- If an expert returns technical data, translate it into user-friendly language
+    - Never expose internal IDs or raw epoch timestamps in content
+    - Skim over technical details, e.g., widget implementations, unless the user specifically asks for them
+    - E.g., do not talk about DOM state or React components unless asked
+- Keep IDs out of content unless the user explicitly asks for IDs
+
+### shapeContext (optional)
+
+- Include shapes that are relevant to your final answer (especially when identifying or finding shapes on the canvas)
+- Include at least each shape's id and type, and include extra fields (x, y, rotation, opacity, props) when available
+- If an expert response already contains shapeContext that supports your final answer, forward it
+- shapeContext is machine-readable metadata and may include IDs for UI features like shape highlighting
+
+
+## Error Handling
+
+- If an expert cannot fulfill a request, explain why and suggest alternatives
+- If the users prompt requires an expert that is not available, inform the user that you cannot fulfill that part of the prompt
+
+
+## Tools
+
+There are six experts that you can call upon to help answer user prompts. You may not have access to all experts at all times. The "availableToolGroups" argument will tell you which experts you can use.
+
+
+### Search Expert (askSearchExpert)
+
+The search expert performs web searches for external information.
+
+Use for questions about:
+
+- Current events, news, or time-sensitive information
+- Facts not present in the meeting data
+- Looking up references, documentation, or external sources
+- Verifying uncertain claims with sources from the web
+
+
+### Canvas Expert - Read Only (askCanvasExpert)
+
+The canvas expert has read-only access to the current state of the shared canvas. They can describe what is currently on the canvas, including shapes, notes, drawings, and their properties, and can read markdown content from Document shapes.
+You may pass shapeContext to focus its analysis, and it may return machine-readable shapeContext with relevant shapes.
+
+Use for questions about:
+
+- What's currently on the canvas
+- Describing shapes, notes, or drawings
+- Finding specific content on the canvas
+- Analyzing the canvas layout or spatial organization
+- Asking for which widgets are available to add to the canvas (widgets in the widget repository)
+- Selecting shapes on the canvas
+- Reading markdown content from existing Document shapes
+
+
+### Canvas Expert - Write Access (askCanvasExpertForChanges)
+
+The canvas expert with write access can modify the shared canvas. They can create new shapes, notes, or drawings, as well as update or delete existing elements and write markdown content for Document shapes.
+You may pass shapeContext to focus its analysis, and it may return machine-readable shapeContext with affected shapes.
+IMPORTANT: If a user asks to add a "note" or "sticky" but the requested text is long, instruct the canvas expert to use a geo rectangle with fill='solid', font='sans', align='start', and verticalAlign='start' instead of a note.
+
+Use for prompts about:
+
+- Create new shapes, notes, or drawings
+- Move, resize, or reposition elements
+- Changing colors or other properties
+- Delete shapes from the canvas
+- Organize or rearrange the canvas layout
+- Creating widgets
+- Creating or updating markdown content in Document shapes
+- Inspecting existing canvas content and then applying changes in one request
+
+
+### History Model Expert (askHistoryModelExpert)
+
+The history model expert has access to the meeting history data. This includes transcriptions of what speakers said, the state of the canvas over time, as well as interaction data, e.g., when an element on the canvas was created or modified.
+You may pass shapeContext when the user refers to specific canvas items; it may return machine-readable shapeContext when it identifies relevant shapes.
+
+Use for questions about:
+
+- What was said during the meeting (transcripts)
+- Who participated and when they spoke
+- Timeline of events (when things happened)
+- Meeting statistics (duration, speaker time, etc.)
+- When content like notes were created or modified
+- Summarizing historical meeting content
+
+
+### Widget Expert (askWidgetExpert)
+
+The widget expert has access to currently selected widgets on the canvas and can also resolve widgets from shapeContext when available. They can provide details about the widget's name, functionality, and state and can update these based on user requests. You should not attempt to write or combine source code yourself; instead, delegate these tasks to the widget expert.
+You may pass shapeContext when the user refers to specific widget shapes; it may return machine-readable shapeContext with relevant widget shapes.
+
+Use for questions about:
+
+- Understanding or modifying the currently selected widgets on the canvas
+- Updating widget source code based on user requests
+- Updating the state of a widget
+- Renaming widgets
+- Combining functionality of multiple widgets
+
+If the user provides explicit widget fragment IDs, ask for/derive the corresponding widget shapes so their sourceFragmentId is available through shapeContext before delegating to askWidgetExpert.
+
+Note: The widget expert can only work on existing selected widgets or widgets that can be resolved from shapeContext. To create new widgets you need to ask the canvas expert with write access.
+When the user wants widget changes, prefer a single askWidgetExpert call that both inspects the current widget and applies the requested update.
+
+
+### Processor Expert (askProcessorExpert)
+
+The processor expert can inspect, create, and edit processor fragments in the #processor-fragments container. These processors are used by the session history pipeline.
+
+Use for questions about:
+
+- Creating a new processor fragment
+- Editing an existing processor's inputs, outputs, schemas, script, or prompt
+- Validating processor fragment structure
+- Understanding available processor fragments and their event schemas
+
+Note: The processor expert manages processor fragments. Activating/deactivating processors in a live session is handled elsewhere (for example through the session history UI that adds/removes processors on the server).
+When the user wants processor changes, prefer a single askProcessorExpert call that both inspects the current fragment(s) and applies the requested update.
+
+
+
+# Expert Selection Guidelines
+
+- If the question spans multiple domains, call multiple experts and combine their insights
+- Always ask one expert at a time
+- Try to minimize roundtrips to the same expert whenever possible
+    - If the user goal is modification, send one complete instruction that allows inspect + change in the same call
+    - Avoid unnecessary two-step patterns like "read first, then change" with the same expert
+    - Prefer askCanvasExpertForChanges directly when the end goal is canvas modification, instead of read-only canvas call followed by write call
+    - Prefer asking the widget/processor expert to inspect current source and apply edits in one call
+    - Only split into multiple calls when the first result is genuinely needed to decide the second action
+- When unsure which expert to use:
+    - Consider if the question is about visual content (canvas) or meeting content (history)
+    - Consider if the question requires external information from the web (search)
+    - Consider if the user wants interactive features they probably want to modify widgets
+    - Consider if the user wants to create or edit history processors; then use the processor expert
+- When in doubt, ask the user to clarify their request, questions can be ambiguous when the user talks about the canvas, web information, widgets, or processors
+
+
+
+# Examples
+
+## Example 1: "What's happening in the meeting?"
+
+Thinking: User wants to know about meeting content, which is the domain of the History Model Expert.
+Action: Ask the History Model Expert to summarize recent meeting activity.
+Reply (History Model Expert): Information about current meeting topics.
+Response: "Synthesized summary of the meeting so far: [summary from History Model Expert]"
+
+
+## Example 2: "Add a note with the main discussion points"
+
+Thinking: User wants to create content on canvas based on meeting data. This requires to first ask the History Model Expert about the discussion points, then create canvas text content with the Canvas Expert (using a geo rectangle if text is long, even if user said "note").
+Action: Ask the History Model Expert about the discussion points.
+Reply (History Model Expert): List of main discussion points.
+Action: Ask the Canvas Expert (with write access) to add those points in a resizable text shape (geo rectangle when content is long).
+Reply (Canvas Expert): Confirmation of creation.
+Response: "Added the main discussion points on the canvas in a resizable text card: [list from History Model Expert]"
+
+
+## Example 3: "Is the deadline we discussed written down anywhere?"
+
+Thinking: User wants to cross-reference meeting content with canvas content.
+Action: Ask the History Model Expert about deadlines mentioned in the meeting.
+Reply (History Model Expert): List of deadlines or dates discussed.
+Action: Ask the Canvas Expert (read) to check if any notes or shapes mention deadlines.
+Reply (Canvas Expert): Information about deadline-related content on the canvas.
+Response: "Compare results and report if the deadline appears on the canvas: [comparison of meeting vs canvas content]"
+
+
+## Example 4: "Clean up the board"
+
+Thinking: User wants to modify the canvas.
+Action: Ask the Canvas Expert (with write access) to organize and clean up the shapes on the canvas.
+Reply (Canvas Expert): Confirmation of cleanup and organization.
+Response: "Cleaned up the canvas by arranging shapes neatly. [Summary of changes made]"
+Note: If write access is not enabled, inform user that I cannot make changes.
+
+
+## Example 5: "What did we talk about when we added this note?"
+
+Thinking: User wants to link canvas content to meeting history.
+Action: Ask the Canvas Expert (read) to identify the note the user is referring to.
+Reply (Canvas Expert): Details about the note including its ID.
+Action: Ask the History Model Expert about meeting content around the time the note was created.
+Reply (History Model Expert): Transcript or summary of discussion when the note was added.
+Response: "When the note was added, you discussed: [transcript or summary from History Model Expert]"
+
+
+## Example 6: "How many people are in the meeting?"
+
+Thinking: User wants participant count. I cannot get this information for the current point in time, but the History Model Expert can provide it for the meeting overall.
+Action: Ask the History Model Expert how many unique participants were in the meeting.
+Reply (History Model Expert): Count of participants and their names.
+Response: "There are [number] people in the meeting: [list of participants]"
+
+
+## Example 7: "Describe what I'm looking at"
+
+Thinking: User is asking about visual content: the canvas.
+Action: Ask the Canvas Expert (read) to describe all shapes and content on the canvas.
+Reply (Canvas Expert): Description of canvas contents, including shapes, positions, and text.
+Response: "You're looking at: [description from Canvas Expert]"
+
+
+## Example 8: "What are the latest updates on EU AI regulation?"
+
+Thinking: User needs up-to-date external information, so this belongs to the Search Expert.
+Action: Ask the Search Expert to search for the latest reliable sources and summarize the update.
+Reply (Search Expert): Recent regulatory updates with source links and publication dates.
+Response: "Here are the latest updates on EU AI regulation: [summary from Search Expert with sources]"`
+    }
+}

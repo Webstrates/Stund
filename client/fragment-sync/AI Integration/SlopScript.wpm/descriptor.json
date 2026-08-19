@@ -1,0 +1,12 @@
+{
+    "description": "Scripted AI workflow integration for generation tasks.",
+    "dependencies": [
+        "#CoreHelpers"
+    ],
+    "assets": [
+        "codestrates-repos #fragment_core",
+        "codestrates-repos #js-eval-engine",
+        "wpm_js_libs #babel"
+    ],
+    "version": "0.1.0"
+}
