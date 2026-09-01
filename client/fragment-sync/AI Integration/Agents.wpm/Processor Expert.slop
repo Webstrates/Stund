@@ -710,7 +710,7 @@ Authoring notes:
 
 Required options:
 - prompt (string, non-empty)
-- model (string, good default is 'cavi/small')
+- model (string, good default is 'anthropic/claude-haiku-4-5')
 - allowDurationEvents (boolean)
 - allowInstantEvents (boolean)
 - combineStreams (boolean)
@@ -741,7 +741,7 @@ Required options:
 - allowInstantEvents (boolean)
 
 Optional options:
-- model (string, good default is 'cavi/small')
+- model (string, good default is 'anthropic/claude-haiku-4-5')
 
 Input streams for vision processing:
 - 'user.camera.video' for participant camera feed
@@ -826,7 +826,7 @@ Use these templates as your canonical starting point when creating or updating p
     type: 'AIPromptProcessor',
     name: 'exampleAIPromptProcessor',
     options: {
-        model: 'cavi/small',
+        model: 'anthropic/claude-haiku-4-5',
         prompt: 'Summarize each chunk into one concise sentence and include a confidence estimate from 0 to 1.',
         additionalInputContext: 0,
         additionalOutputContext: 0,

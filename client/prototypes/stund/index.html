@@ -1,7 +1,7 @@
 <!doctype html>
 <html data-protected="all"><head><script id="WPMv2-script" type="text/javascript">/**
  * WPMv2 - Webstrate Package Manager
- * 
+ *
  * Copyright 2019 Rolf Bagge, Janus Bager Kristensen,
  * CAVI - Center for Advanced Visualisation and Interaction,
  * Aarhus University
@@ -11,7 +11,7 @@
  * You may obtain a copy of the License at
  *
  * http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -121,7 +121,7 @@
                     // Immediately call the callback since no more packages are left
                     callback();
                 }
-                
+
             };
 
             /**
@@ -310,7 +310,7 @@
                 } else {
                     scriptContent = script.innerText;
                 }
-                
+
                 scriptContent = 'try{'+scriptContent+'} catch (ex){console.error("Bootstrap runtime error in '+packageDom.getAttribute("id").replaceAll("'","")+':", ex);}';
 
                 const AsyncFunction = Object.getPrototypeOf(async function () {}).constructor;
@@ -364,7 +364,7 @@
                     //Skip this package
                     return;
                 }
-                
+
                 let pkgOptions = {
                     repository: pkg.repository,
                     package: pkg.name
@@ -409,7 +409,7 @@
                 if(overrideOptions.repository != null) {
                     console.warn("Adding a full repository, does not atm support overriding options for repository...");
                 }
-                
+
                 try {
                     let packages = await WPMv2.getPackagesFromRepository(repoUrl);
                     for(let pkg of packages) {
@@ -450,7 +450,7 @@
                     }
                 }
             }
-            
+
             // Resolve all the packages
             await Promise.all(packages.map(async (pkg)=>{
                 let wpmPackage = null;
@@ -580,7 +580,7 @@
                 return pkgName === searchPackageName;
             }) != null;
         }
-        
+
         static getName(searchPackage){
             if(searchPackage instanceof WPMPackage) {
                 return searchPackage.name;
@@ -589,7 +589,7 @@
             } else {
                 console.warn("Unable to infer package name from:", searchPackage);
                 return null;
-            }            
+            }
         }
 
         /**
@@ -821,7 +821,7 @@
 
         /**
          * Get the package data based on the package DOM node
-         * 
+         *
          * @param {Node} packageDOM the package dom node
          * @returns {WPMPackage} the package
          * @ignore
@@ -832,7 +832,7 @@
 
                 let descriptorDom = packageDOM.querySelector("script[type='descriptor'], wpm-descriptor");
 
-                if (descriptorDom !== null) {                    
+                if (descriptorDom !== null) {
                     try {
                         let packageJson = JSON.parse(descriptorDom.textContent);
                         let repository = packageDOM.getAttribute("data-repository");
@@ -859,7 +859,7 @@
 
         /**
          * Retrieve the package dom from a repository
-         * 
+         *
          * @param {String} repository the repository to retrieve from
          * @param {String} packageName the package to retrieve
          * @returns {Node} the package dom node
@@ -1098,7 +1098,7 @@
                 if(url.endsWith("?raw") && !url.endsWith("/?raw")) {
                     url = url.substring(0, url.lastIndexOf("?raw")) + "/?raw";
                 }
-                
+
                 // Check the cache for ongoing fetches for this URL
                 let cachedDom = WPMv2.domCache.get(url);
                 if (cachedDom != null) {
@@ -1130,7 +1130,7 @@
                     }
                 })();
                 WPMv2.domCache.set(url, fetcherPromise);
-                
+
                 return (await fetcherPromise).dom;
             }
 
@@ -1508,7 +1508,7 @@
             let self = this;
 
             this.descriptor = packageJson;
-            
+
             ["version", "friendlyName", "dependencies", "optionalDependencies", "description", "changelog", "documentationLink", "license"].forEach((packageProperty)=>{
                 if (packageJson.hasOwnProperty(packageProperty)){
                     this[packageProperty] = packageJson[packageProperty];
@@ -1616,7 +1616,7 @@
         revision: "$Id: WPMv2.js 1023 2023-03-14 10:02:57Z au182811@uni.au.dk $",
         test: WPMv2
     };
-    
+
     window.WPM = window.WPMv2;
     window.WPMPackage = WPMPackage;
 })(window);
@@ -1625,10 +1625,10 @@
 class WPMBoot {
     static loadedCallbacks = [];
     static isLoaded = false;
-    
+
     static async wpmv2_bootloader(){
         document.querySelector("html").setAttribute("transient-wpm2-bootloader", "loading");
-        
+
         let bootConfigElement = document.querySelector("head script[type='text/json+bootconfig']");
         if (!bootConfigElement){
             return;
@@ -1674,7 +1674,7 @@ class WPMBoot {
                 await WPMv2.require(requireStep.dependencies);
             }
         }
-               
+
         // Fire loaded events
         document.querySelector("html").setAttribute("transient-wpm2-bootloader", "initializing");
         while (WPMBoot.loadedCallbacks.length>0){
@@ -1687,7 +1687,7 @@ class WPMBoot {
         }
         document.querySelector("html").setAttribute("transient-wpm2-bootloader", "loaded");
     }
-    
+
     static async onLoaded(callback){
         if (WPMBoot.isLoaded){
             await callback();
@@ -1953,10 +1953,10 @@ if(typeof webstrate  !== "undefined") {
 }
 </script>
         <link href="manifest.json" rel="manifest"/><link href="favicon.ico" rel="icon"/></head><body>
-        
-        
-                              
-        
+
+
+
+
             <code-folder name="Codestrates"><wpm-package data-repository="https://cdn.jsdelivr.net/gh/Webstrates/WPM@master/build.html" id="WPM-dev">
                     <script id="descriptor-script" type="descriptor">
                     {
@@ -1965,8 +1965,8 @@ if(typeof webstrate  !== "undefined") {
                         "forceEmbedding": true
                     }
 
-                    </script>                
-                    
+                    </script>
+
                 </wpm-package><wpm-package data-repository="wpm-repos" id="WPM-loading-skin-simple" style="width: 0px; height: 0px; position: absolute; visibility: hidden;"><script id="descriptor-script" type="descriptor">
 {
     "description": "A simple loading skin for the bootloader to avoid seeing improperly rendered HTML while loading",
@@ -5221,10 +5221,6 @@ image generation. Web search is a LiteLLM proxy feature (see limitations below).
   the caller to supply a model, and throws if one is missing. The `MODEL_CONFIGS` table in
   `Model Manager.jsx` is the single source of model defaults, reached through `getModel(id)`; the
   connector descriptors carry no per-capability model defaults either.
-- **`cavi/transcription` is not portable.** It is the Model Manager default for both
-  `speak-prompt-transcription` and `widget-speech-to-text`, and has no `provider/` prefix for
-  `resolveModel` to strip, so it is sent verbatim to OpenAI and 404s there. On the OpenAI connector,
-  pick `openai/whisper-1` in the Model Manager's STT lists.
 
 ### AI sidebar orchestration
 
@@ -5326,7 +5322,7 @@ Important state keys:
 - `history-session-id` (persistent DOM state)
 - `history-session-joined` (transient DOM state)
 - `history-session-auto-join` (persistent DOM state)
-- `history-model-server` (persistent DOM state; overrides `DEFAULT_SESSION_HISTORY_SERVER = https://history.stream.cavi.au.dk`)
+- `history-model-server` (persistent DOM state; overrides `DEFAULT_SESSION_HISTORY_SERVER = https://my-activity-session-server.com`)
 
 ### Session API
 
@@ -16738,14 +16734,9 @@ import {
 
 const DEFAULT_COMPLETION_MODELS = [
     'openai/gpt-5.5',
-    'openai/gpt-5.4',
-    'anthropic/claude-opus-4-8',
+    'anthropic/claude-opus-5',
     'anthropic/claude-sonnet-5',
-    'anthropic/claude-haiku-4-5',
-    'natai/kimi',
-    'natai/glm',
-    'cavi/medium',
-    'cavi/small'
+    'anthropic/claude-haiku-4-5'
 ];
 
 const DEFAULT_IMAGE_MODELS = [
@@ -16755,7 +16746,6 @@ const DEFAULT_IMAGE_MODELS = [
 ];
 
 const DEFAULT_STT_MODELS = [
-    'cavi/transcription',
     'openai/whisper-1'
 ];
 
@@ -16854,7 +16844,7 @@ const MODEL_CONFIGS = [
         name: 'Speech-to-Text Model',
         type: 'stt',
         category: 'widget',
-        defaultModel: 'cavi/transcription'
+        defaultModel: 'openai/whisper-1'
     },
     {
         id: 'widget-text-to-speech',
@@ -16868,7 +16858,7 @@ const MODEL_CONFIGS = [
         name: 'Speak Prompt STT Model',
         type: 'stt',
         category: 'general',
-        defaultModel: 'cavi/transcription'
+        defaultModel: 'openai/whisper-1'
     }
 ];
 
@@ -21310,7 +21300,7 @@ export function createFragmentRepository(repositoryConfig) {
     "assets": [],
     "version": "0.1.0"
 }
-</wpm-descriptor></code-fragment><code-fragment class="api" data-type="text/javascript+babel" name="Session History API">export const DEFAULT_SESSION_HISTORY_SERVER = 'https://history.stream.cavi.au.dk';
+</wpm-descriptor></code-fragment><code-fragment class="api" data-type="text/javascript+babel" name="Session History API">export const DEFAULT_SESSION_HISTORY_SERVER = 'https://my-activity-session-server.com';
 
 export const normalizeSessionHistoryServerUrl = (serverUrl = DEFAULT_SESSION_HISTORY_SERVER) => {
     const trimmedServerUrl = typeof serverUrl === 'string' ? serverUrl.trim() : '';
@@ -25881,7 +25871,7 @@ export const resetAPIKey = async (cookieName) => {
     console.log('API key reset. Please refresh the page to enter a new key.');
 };
 
-export const DEFAULT_LITELLM_URL = 'https://ai.cavi.au.dk';
+export const DEFAULT_LITELLM_URL = 'https://my-litellm-proxy.com';
 export const DEFAULT_OLLAMA_URL = 'http://localhost:11434';
 
 // Default public API base URLs (include the version segment, per the OpenAI
@@ -30249,7 +30239,7 @@ Authoring notes:
 
 Required options:
 - prompt (string, non-empty)
-- model (string, good default is 'cavi/small')
+- model (string, good default is 'anthropic/claude-haiku-4-5')
 - allowDurationEvents (boolean)
 - allowInstantEvents (boolean)
 - combineStreams (boolean)
@@ -30280,7 +30270,7 @@ Required options:
 - allowInstantEvents (boolean)
 
 Optional options:
-- model (string, good default is 'cavi/small')
+- model (string, good default is 'anthropic/claude-haiku-4-5')
 
 Input streams for vision processing:
 - 'user.camera.video' for participant camera feed
@@ -30365,7 +30355,7 @@ Use these templates as your canonical starting point when creating or updating p
     type: 'AIPromptProcessor',
     name: 'exampleAIPromptProcessor',
     options: {
-        model: 'cavi/small',
+        model: 'anthropic/claude-haiku-4-5',
         prompt: 'Summarize each chunk into one concise sentence and include a confidence estimate from 0 to 1.',
         additionalInputContext: 0,
         additionalOutputContext: 0,

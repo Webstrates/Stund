@@ -19,14 +19,9 @@ import {
 
 const DEFAULT_COMPLETION_MODELS = [
     'openai/gpt-5.5',
-    'openai/gpt-5.4',
-    'anthropic/claude-opus-4-8',
+    'anthropic/claude-opus-5',
     'anthropic/claude-sonnet-5',
-    'anthropic/claude-haiku-4-5',
-    'natai/kimi',
-    'natai/glm',
-    'cavi/medium',
-    'cavi/small'
+    'anthropic/claude-haiku-4-5'
 ];
 
 const DEFAULT_IMAGE_MODELS = [
@@ -36,7 +31,6 @@ const DEFAULT_IMAGE_MODELS = [
 ];
 
 const DEFAULT_STT_MODELS = [
-    'cavi/transcription',
     'openai/whisper-1'
 ];
 
@@ -107,14 +101,14 @@ const MODEL_CONFIGS = [
         name: 'Widget Expert',
         type: 'completion',
         category: 'expert',
-        defaultModel: 'anthropic/claude-opus-4-8'
+        defaultModel: 'anthropic/claude-opus-5'
     },
     {
         id: 'processor-expert',
         name: 'Processor Expert',
         type: 'completion',
         category: 'expert',
-        defaultModel: 'anthropic/claude-opus-4-8'
+        defaultModel: 'anthropic/claude-opus-5'
     },
     {
         id: 'widget-completion',
@@ -135,7 +129,7 @@ const MODEL_CONFIGS = [
         name: 'Speech-to-Text Model',
         type: 'stt',
         category: 'widget',
-        defaultModel: 'cavi/transcription'
+        defaultModel: 'openai/whisper-1'
     },
     {
         id: 'widget-text-to-speech',
@@ -149,7 +143,7 @@ const MODEL_CONFIGS = [
         name: 'Speak Prompt STT Model',
         type: 'stt',
         category: 'general',
-        defaultModel: 'cavi/transcription'
+        defaultModel: 'openai/whisper-1'
     }
 ];
 

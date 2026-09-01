@@ -1,4 +1,4 @@
-export const DEFAULT_SESSION_HISTORY_SERVER = 'https://history.stream.cavi.au.dk';
+export const DEFAULT_SESSION_HISTORY_SERVER = 'https://my-activity-session-server.com';
 
 export const normalizeSessionHistoryServerUrl = (serverUrl = DEFAULT_SESSION_HISTORY_SERVER) => {
     const trimmedServerUrl = typeof serverUrl === 'string' ? serverUrl.trim() : '';

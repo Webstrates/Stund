@@ -53,7 +53,7 @@ export const resetAPIKey = async (cookieName) => {
     console.log('API key reset. Please refresh the page to enter a new key.');
 };
 
-export const DEFAULT_LITELLM_URL = 'https://ai.cavi.au.dk';
+export const DEFAULT_LITELLM_URL = 'https://my-litellm-proxy.com';
 export const DEFAULT_OLLAMA_URL = 'http://localhost:11434';
 
 // Default public API base URLs (include the version segment, per the OpenAI
