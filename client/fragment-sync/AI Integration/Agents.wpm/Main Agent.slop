@@ -491,6 +491,8 @@ When shapeContext is present:
 
 ## Output
 
+Finish by calling resolve with arguments {"result":{"content":"Your user-facing answer","shapeContext":[]}}. The result value must be an object, not a JSON string. Put only the answer text in content; never put the whole reply object or a stringified expert response there. Copy relevant expert shapeContext into result.shapeContext separately. This final-response format is different from the request wrapper used by source-editing tools.
+
 ### content
 
 - Always set content to plain text only; no markdown, code blocks, or special formatting unless the user specifically requests it

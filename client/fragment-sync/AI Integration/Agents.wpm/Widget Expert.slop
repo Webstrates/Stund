@@ -1,11 +1,13 @@
 import { CanvasExpert } from '#canvas-expert-slop';
 import { HistoryModelExpert } from '#history-model-expert-slop';
 import { getDOMStore, setDOMState } from '#CoreHelpers .dom-store';
+import { createFragmentHarness, harnessToolSchemas } from '#Agents .harness-helpers';
 
 
 
 const canvasExpert = new CanvasExpert();
 const historyModelExpert = new HistoryModelExpert();
+const widgetHarness = createFragmentHarness('widget');
 
 export class WidgetExpert {
     normalizeWidgetFragmentIds(widgetFragmentIds = []) {
@@ -30,17 +32,29 @@ export class WidgetExpert {
         return ids;
     }
 
-    getWidgetFragmentById(id) {
-        if (typeof id !== 'string' || !id.trim()) {
-            throw new Error('Widget fragment ID must be a non-empty string.');
-        }
+    @Tool(harnessToolSchemas.listFragments)
+    listWidgetSources(request) {
+        return widgetHarness.listFragments(request);
+    }
 
-        const fragment = Fragment.one(`code-fragment#${id}`);
-        if (!fragment) {
-            throw new Error(`No widget fragment found with ID ${id}.`);
-        }
+    @Tool(harnessToolSchemas.searchFragments)
+    searchWidgetSource(request) {
+        return widgetHarness.searchFragments(request);
+    }
 
-        return fragment;
+    @Tool(harnessToolSchemas.readFragment)
+    readWidgetSource(request) {
+        return widgetHarness.readFragment(request);
+    }
+
+    @Tool(harnessToolSchemas.editFragment)
+    editWidgetSource(request) {
+        return widgetHarness.editFragment(request);
+    }
+
+    @Tool(harnessToolSchemas.applyFragmentPatch)
+    applyWidgetSourcePatch(request) {
+        return widgetHarness.applyFragmentPatch(request);
     }
 
     getWidgetNameMapFromCanvas() {
@@ -56,8 +70,10 @@ export class WidgetExpert {
         const ids = this.normalizeWidgetFragmentIds(sourceFragmentIds);
         const nameMap = {};
         for (const id of ids) {
-            const fragment = Fragment.one(`code-fragment#${id}`);
-            if (!fragment) {
+            let fragment;
+            try {
+                fragment = widgetHarness.getFragment(id);
+            } catch (error) {
                 continue;
             }
             const name = fragment.element.getAttribute('name') || 'Untitled Widget';
@@ -85,7 +101,7 @@ export class WidgetExpert {
         returns: { type: 'string' }
     })
     getWidgetName(id) {
-        const fragment = this.getWidgetFragmentById(id);
+        const fragment = widgetHarness.getFragment(id);
         return fragment.element.getAttribute('name') || 'Untitled Widget';
     }
 
@@ -109,7 +125,7 @@ export class WidgetExpert {
         returns: { type: 'string' }
     })
     updateWidgetName(id, newName) {
-        const fragment = this.getWidgetFragmentById(id);
+        const fragment = widgetHarness.getFragment(id);
         fragment.element.setAttribute('name', newName);
 
         return `Widget name updated to "${newName}".`;
@@ -117,84 +133,19 @@ export class WidgetExpert {
 
 
 
-    @Tool({
-        description: 'Retrieves the source code of a specific widget by its fragment ID.',
-        parameters: {
-            type: 'object',
-            properties: {
-                id: {
-                    type: 'string',
-                    description: 'The fragment ID of the widget.'
-                }
-            },
-            required: ['id'],
-            additionalProperties: false
-        },
-        returns: { type: 'string' }
-    })
-    getWidgetSource(id) {
-        const fragment = this.getWidgetFragmentById(id);
-        return fragment.raw;
+    @Tool(harnessToolSchemas.getSource)
+    getWidgetSource(request) {
+        return widgetHarness.getSource(request);
     }
 
-    @Tool({
-        description: 'Validates the source code of a specific widget by its fragment ID.',
-        parameters: {
-            type: 'object',
-            properties: {
-                id: {
-                    type: 'string',
-                    description: 'The fragment ID of the widget.'
-                }
-            },
-            required: ['id'],
-            additionalProperties: false
-        },
-        returns: { type: 'string' }
-    })
-    async validateWidgetSource(id) {
-        const fragment = this.getWidgetFragmentById(id);
-
-        try {
-            const { Widget } = await fragment.require();
-
-            if (typeof Widget !== 'function') {
-                throw new Error('The widget code does not export a valid Widget component.');
-            }
-
-            return 'Widget source is valid.';
-        } catch (error) {
-            throw new Error(`There was an error validating the widget code: ${error.message}`);
-        }
+    @Tool(harnessToolSchemas.validateSource)
+    validateWidgetSource(request) {
+        return widgetHarness.validateSource(request);
     }
 
-    @Tool({
-        description: 'Updates the source code of a specific widget by its fragment ID.',
-        parameters: {
-            type: 'object',
-            properties: {
-                id: {
-                    type: 'string',
-                    description: 'The fragment ID of the widget.'
-                },
-                widgetSource: {
-                    type: 'string',
-                    description: 'The new source code for the widget.'
-                }
-            },
-            required: ['id', 'widgetSource'],
-            additionalProperties: false
-        },
-        returns: { type: 'string' }
-    })
-    async updateWidgetSource(id, widgetSource) {
-        const fragment = this.getWidgetFragmentById(id);
-
-        fragment.raw = widgetSource;
-
-        await this.validateWidgetSource(id);
-
-        return 'Widget source updated and validated successfully.';
+    @Tool(harnessToolSchemas.writeSource)
+    writeWidgetSource(request) {
+        return widgetHarness.writeSource(request);
     }
 
 
@@ -214,7 +165,7 @@ export class WidgetExpert {
         returns: { type: 'object' }
     })
     getWidgetState(id) {
-        this.getWidgetFragmentById(id);
+        widgetHarness.getFragment(id);
         return getDOMStore(id);
     }
 
@@ -241,7 +192,7 @@ export class WidgetExpert {
         returns: { type: 'string' }
     })
     updateWidgetState(id, key, value) {
-        this.getWidgetFragmentById(id);
+        widgetHarness.getFragment(id);
         setDOMState(key, value, id);
 
         return `Widget state for key "${key}" updated successfully.`;
@@ -266,9 +217,13 @@ export class WidgetExpert {
             this.getWidgetName,
             this.updateWidgetName,
 
-            this.getWidgetSource,
+            this.listWidgetSources,
+            this.searchWidgetSource,
+            this.readWidgetSource,
+            this.editWidgetSource,
+            this.applyWidgetSourcePatch,
             this.validateWidgetSource,
-            this.updateWidgetSource,
+            this.writeWidgetSource,
 
             this.getWidgetState,
             this.updateWidgetState,
@@ -336,7 +291,6 @@ export class WidgetExpert {
 
 You help users understand and modify widgets on the canvas. Widgets are interactive React components defined by source code that can display dynamic content, visualizations, and interactive elements.
 
-
 ## Input
 
 ### prompt
@@ -374,7 +328,9 @@ You also receive a "baseContext" object with a widgetNameMap: A mapping of widge
 
 ## Error Handling
 
-- If validation fails, identify the error and fix the code before trying again
+- Harness results say whether source was written: written=false means the widget is unchanged; fix the request and resend the complete batch
+- For stale revisions or missing matches, read the relevant current source; for candidate syntax errors, fix the new code without rereading unchanged source
+- written=true with ok=false means code is live but failed to load; repair it immediately using the returned committed revision, unless validation reports source-changed (read again first)
 - If the widget source is invalid JSX, explain the issue in simple terms
 - Always ensure "export function Widget" is present
 - Handle missing keys in lists, hook rule violations, and cleanup functions properly
@@ -387,21 +343,40 @@ You also receive a "baseContext" object with a widgetNameMap: A mapping of widge
 - Use when the user asks about or wants to change the widget's display name
 - Always pass an explicit widget fragment id
 
-### getWidgetSource
+### Editing Harness
 
-- Use when you need to examine the current widget code to understand its structure before making changes
-- Always pass an explicit widget fragment id
+These tools require tool arguments with exactly one "request" property whose value is a JSON object: {"request":{"id":"<widget-fragment-id>"}}. Do not JSON.stringify or quote the request object, put its fields at the top level, or nest another request inside it. Source code inside oldString, newString, source, and diff remains JSON string data with normal escaping.
+Tools access only local widget sources. Prefer editWidgetSource/applyWidgetSourcePatch; use writeWidgetSource only for new widgets or when smaller edits are not viable. Preserve unrelated code.
+Use known IDs, read relevant areas, and batch the change plus changelog into one write. Aim for 2-4 rounds; trust returned excerpts and validation after success.
 
-### validateWidgetSource
+#### listWidgetSources
 
-- Use after making changes to verify the widget code is valid before confirming success to the user
-- Always pass an explicit widget fragment id
+Discover source IDs, names, and revisions with {"request":{}} or {"request":{"namePattern":"<name filter>"}}.
 
-### updateWidgetSource
+#### searchWidgetSource
 
-- Use when the user wants to modify the widget's functionality, appearance, or behavior
-- This tool also validates the code
-- Always pass an explicit widget fragment id
+Locate code with {"request":{"ids":["<widget-fragment-id>"],"pattern":"<text to find>"}}; mode='regex' inside request supports combined patterns.
+
+#### readWidgetSource
+
+Read up to 300 lines with {"request":{"id":"<widget-fragment-id>"}}, or add ranges:[{startLine, endLine}] inside request. Continue read/search pages with {"request":{"cursor":"<nextCursor>"}} only; finish partial lines before using them as anchors.
+
+#### editWidgetSource
+
+Batch unique exact oldString/newString replacements against the original snapshot using expectedRevision. Copy text without line numbers and include enough context; reread and adjust failed anchors.
+Argument structure: {"request":{"id":"<widget-fragment-id>","expectedRevision":"<revision from read/list>","edits":[{"oldString":"<exact existing source text>","newString":"<replacement source text>"}]}}. Replace placeholders with actual values. If the error says request was a string, resend this object structure with the same edit contents; do not stringify request.
+
+#### applyWidgetSourcePatch
+
+Apply all unified-diff hunks together using expectedRevision, original line positions, and exact context. Optional headers must name source.
+
+#### validateWidgetSource
+
+Use {"request":{"id":"<widget-fragment-id>"}} for validation-only checks; writes validate automatically.
+
+#### writeWidgetSource
+
+Write the entire source with {"request":{"id":"<widget-fragment-id>","source":"<complete source>","expectedRevision":"<revision from read/list>"}}, using the read/list revision.
 
 ### getWidgetState / updateWidgetState
 
@@ -623,18 +598,18 @@ export function Widget() {
 ## Example 1: "Make the background blue"
 
 Thinking: User wants to change the container background color.
-Action: Update the widget source to add backgroundColor style property.
-Action: Call updateWidgetSource with the target widget fragment id and the modified code.
-Reply (updateWidgetSource): Confirmation of update and validation.
+Action: Read the widget using readWidgetSource with request={id}.
+Action: Call editWidgetSource with the read revision, a unique style replacement, and the changelog edit in one batch.
+Reply (editWidgetSource): Final excerpts and validation.
 Response: "Updated the widget background to blue."
 
 
 ## Example 2: "Add a button that increments a counter"
 
 Thinking: User wants interactive state management.
-Action: Add useState for counter and a button with onClick handler.
-Action: Call updateWidgetSource with the target widget fragment id and the new code.
-Reply (updateWidgetSource): Confirmation of update and validation.
+Action: Read the relevant source using readWidgetSource with request={id}.
+Action: Call editWidgetSource with the read revision and the required imports, counter, button, and changelog replacements in one batch.
+Reply (editWidgetSource): Final excerpts and validation.
 Response: "Added a counter button to the widget. Click it to increment the count."
 
 
@@ -644,8 +619,8 @@ Thinking: User wants a Vega-Lite visualization with meeting data.
 Action: Call getEventTypes to find transcription evnts and then getEventTypeSchema to understand transcript event structure.
 Reply (getEventTypeSchema): Schema with speaker, duration fields.
 Action: Create widget code using VegaLite and useSessionModel.
-Action: Call updateWidgetSource with the target widget fragment id and the visualization code.
-Reply (updateWidgetSource): Confirmation of update and validation.
+Action: Read the initial widget revision, then call writeWidgetSource with request={id: target widget fragment id, source: visualization code, expectedRevision: read revision}.
+Reply (writeWidgetSource): Confirmation of write and validation.
 Response: "Created a bar chart showing speaking time for each participant."
 
 
@@ -660,7 +635,7 @@ Response: "Renamed the widget to 'Meeting Timer'."
 ## Example 5: "What does this widget do?"
 
 Thinking: User wants to understand the widget's functionality.
-Action: Call getWidgetSource for the target widget fragment id, then analyze it.
+Action: Call readWidgetSource with the target widget fragment id in request, then analyze it.
 Response: "This widget displays a real-time clock that updates every second. It shows the current time in your local timezone."`
     }
 }

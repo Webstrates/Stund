@@ -18,10 +18,10 @@ import {
 
 
 const DEFAULT_COMPLETION_MODELS = [
-    'openai/gpt-5.5',
-    'anthropic/claude-opus-5',
-    'anthropic/claude-sonnet-5',
-    'anthropic/claude-haiku-4-5'
+    'openai/gpt-6.1-sol',
+    'anthropic/claude-opus-5-5',
+    'anthropic/claude-sonnet-5-5',
+    'anthropic/claude-haiku-5-5'
 ];
 
 const DEFAULT_IMAGE_MODELS = [
@@ -66,21 +66,21 @@ const MODEL_CONFIGS = [
         name: 'Main Agent',
         type: 'completion',
         category: 'expert',
-        defaultModel: 'anthropic/claude-sonnet-5'
+        defaultModel: 'anthropic/claude-sonnet-5-5'
     },
     {
         id: 'search-expert',
         name: 'Search Expert',
         type: 'completion',
         category: 'expert',
-        defaultModel: 'anthropic/claude-sonnet-5'
+        defaultModel: 'anthropic/claude-sonnet-5-5'
     },
     {
         id: 'canvas-expert',
         name: 'Canvas Expert',
         type: 'completion',
         category: 'expert',
-        defaultModel: 'anthropic/claude-sonnet-5'
+        defaultModel: 'anthropic/claude-sonnet-5-5'
     },
     {
         id: 'canvas-expert-image-generation',
@@ -94,28 +94,28 @@ const MODEL_CONFIGS = [
         name: 'History Model Expert',
         type: 'completion',
         category: 'expert',
-        defaultModel: 'anthropic/claude-sonnet-5'
+        defaultModel: 'anthropic/claude-sonnet-5-5'
     },
     {
         id: 'widget-expert',
         name: 'Widget Expert',
         type: 'completion',
         category: 'expert',
-        defaultModel: 'anthropic/claude-opus-5'
+        defaultModel: 'anthropic/claude-opus-5-5'
     },
     {
         id: 'processor-expert',
         name: 'Processor Expert',
         type: 'completion',
         category: 'expert',
-        defaultModel: 'anthropic/claude-opus-5'
+        defaultModel: 'anthropic/claude-opus-5-5'
     },
     {
         id: 'widget-completion',
         name: 'Completion Model',
         type: 'completion',
         category: 'widget',
-        defaultModel: 'anthropic/claude-sonnet-5'
+        defaultModel: 'anthropic/claude-sonnet-5-5'
     },
     {
         id: 'widget-image-generation',

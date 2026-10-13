@@ -89,6 +89,39 @@ function getParameterNames(parameters) {
     return [...required, ...optional];
 }
 
+// Check return structure before accepting resolve; custom values are checked
+// against their JSON schema before conversion to runtime values.
+function validateReturnStructure(schema, value, path = 'result') {
+    if (!schema || !schema.type) {
+        return;
+    }
+    const actualType = value === null ? 'null' : Array.isArray(value) ? 'array' : typeof value;
+    const expectedTypes = Array.isArray(schema.type) ? schema.type : [schema.type];
+    const matchesType = expectedTypes.some(type => type === 'integer' ? Number.isInteger(value) : type === actualType);
+    if (!matchesType) {
+        throw new Error(`${path} must be ${expectedTypes.join(' or ')}; received ${actualType}. Return objects and arrays directly, without JSON.stringify.`);
+    }
+    if (actualType === 'object') {
+        const properties = schema.properties || {};
+        for (const key of schema.required || []) {
+            if (!Object.prototype.hasOwnProperty.call(value, key)) {
+                throw new Error(`${path}.${key} is required.`);
+            }
+        }
+        for (const [key, childValue] of Object.entries(value)) {
+            if (!Object.prototype.hasOwnProperty.call(properties, key)) {
+                if (schema.additionalProperties === false) {
+                    throw new Error(`${path}.${key} is not allowed by the return schema.`);
+                }
+                continue;
+            }
+            validateReturnStructure(properties[key], childValue, `${path}.${key}`);
+        }
+    } else if (actualType === 'array' && schema.items) {
+        value.forEach((item, index) => validateReturnStructure(schema.items, item, `${path}[${index}]`));
+    }
+}
+
 async function convertCustomTypeValue(customType, value) {
     if (!customType || typeof customType.getValueFromJSON !== 'function') {
         return value;
@@ -313,7 +346,11 @@ export function Slop(typeDescription) {
                                 return parsedContent;
                             }
                         } catch (ex) {
-                            // Fall back to a content-shaped result when the model returned plain text.
+                            // JSON-looking replies must be repaired by the model, not
+                            // wrapped in content and shown verbatim in the chat.
+                            if (/^\s*[\[{]/.test(textContent) || /^\s*```/.test(textContent)) {
+                                return textContent;
+                            }
                         }
                     }
 
@@ -388,6 +425,10 @@ export function Slop(typeDescription) {
                     description: 'The return value from the method call'
                 };
                 resolveTool.typeDescription.parameters.required.push('result');
+                if (returnSchema.type === 'object' && returnSchema.properties?.content?.type === 'string') {
+                    resolveTool.typeDescription.description += ' Send arguments as {"result":{"content":"Your answer","shapeContext":[]}}. result is an object; content contains only the user-facing answer. Never put a serialized reply object inside result or content.';
+                    resolveTool.typeDescription.parameters.properties.result.description = 'The reply object itself, not a JSON string. Put the answer text in content and optional shape metadata in shapeContext.';
+                }
                 // Store custom type if present
                 if (typeDescription.returns.getJSONSchema) {
                     resolveTool.typeDescription._customTypes = { result: typeDescription.returns };
@@ -538,6 +579,24 @@ on the method body and the arguments given.`;
                     let argumentValues;
                     try {
                         const parameters = tool.typeDescription.parameters;
+                        if (tool === resolveTool) {
+                            try {
+                                validateReturnStructure(convertSchemaCustomTypes(parameters), toolArgs, 'arguments');
+                                if (parameters.properties?.result?.properties?.content?.type === 'string') {
+                                    let embeddedReply;
+                                    try {
+                                        embeddedReply = JSON.parse(toolArgs.result.content);
+                                    } catch (error) {
+                                        // User-facing text normally is not JSON.
+                                    }
+                                    if (embeddedReply && typeof embeddedReply.content === 'string' && Array.isArray(embeddedReply.shapeContext)) {
+                                        throw new Error('result.content contains a serialized reply. Move its content text to result.content and its shapes to result.shapeContext.');
+                                    }
+                                }
+                            } catch (error) {
+                                throw new Error(`Invalid resolve arguments: ${error.message} ${resolveTool.typeDescription.description} Retry resolve with the corrected result; do not repeat completed actions.`);
+                            }
+                        }
                         const requiredParams = parameters?.required || [];
                         const properties = parameters?.properties || {};
                         const parameterOrder = getParameterNames(parameters);

@@ -1,4 +1,5 @@
 import { HistoryModelExpert } from '#history-model-expert-slop';
+import { createFragmentHarness, getSourceRevision, harnessToolSchemas, validateProcessorDefinitionShape } from '#Agents .harness-helpers';
 
 
 
@@ -89,6 +90,7 @@ const PROCESSOR_BASE_CONFIG_SCHEMA = {
 
 
 const historyModelExpert = new HistoryModelExpert();
+const processorHarness = createFragmentHarness('processor');
 
 export class ProcessorExpert {
     getProcessorContainer() {
@@ -99,13 +101,29 @@ export class ProcessorExpert {
         return container;
     }
 
-    getProcessorFragmentById(id) {
-        const escapedId = CSS.escape(id);
-        const fragment = Fragment.one(`code-fragment#${escapedId}`);
-        if (!fragment) {
-            throw new Error(`No processor fragment found with id "${id}".`);
-        }
-        return fragment;
+    @Tool(harnessToolSchemas.listFragments)
+    listProcessorSources(request) {
+        return processorHarness.listFragments(request);
+    }
+
+    @Tool(harnessToolSchemas.searchFragments)
+    searchProcessorSource(request) {
+        return processorHarness.searchFragments(request);
+    }
+
+    @Tool(harnessToolSchemas.readFragment)
+    readProcessorSource(request) {
+        return processorHarness.readFragment(request);
+    }
+
+    @Tool(harnessToolSchemas.editFragment)
+    editProcessorSource(request) {
+        return processorHarness.editFragment(request);
+    }
+
+    @Tool(harnessToolSchemas.applyFragmentPatch)
+    applyProcessorSourcePatch(request) {
+        return processorHarness.applyFragmentPatch(request);
     }
 
     serializeProcessorDefinition(processorDefinition) {
@@ -113,50 +131,16 @@ export class ProcessorExpert {
     }
 
     async readProcessorDefinitionFromFragment(fragmentId) {
-        const fragment = this.getProcessorFragmentById(fragmentId);
+        const fragment = processorHarness.getFragment(fragmentId);
         const exportsObject = await fragment.require();
 
         if (!exportsObject || !exportsObject.processor) {
             throw new Error(`Fragment "${fragmentId}" does not export "processor".`);
         }
 
+        validateProcessorDefinitionShape(exportsObject.processor, window.Babel);
         return exportsObject.processor;
     }
-
-    async collectProcessorFragmentMeta(fragmentElement) {
-        const fragmentId = fragmentElement.id;
-        const fragmentName = fragmentElement.getAttribute('name') || 'Unnamed Processor';
-        const meta = {
-            fragmentId,
-            fragmentName,
-            valid: false
-        };
-
-        if (!fragmentId) {
-            meta.error = 'Processor fragment is missing an id.';
-            return meta;
-        }
-
-        try {
-            const definition = await this.readProcessorDefinitionFromFragment(fragmentId);
-            meta.valid = true;
-            meta.processorName = definition.name;
-            meta.processorType = definition.type;
-            meta.inputs = definition.options.inputs;
-            meta.outputs = definition.options.outputs;
-            meta.outputSchemas = Object.fromEntries(
-                Object.entries(definition.options.outputs || {}).map(([eventType, outputConfig]) => [eventType, outputConfig?.schemaId || null])
-            );
-            const session = window.sessionHistory?.session;
-            meta.active = !!(session?.schema?.processors?.[definition.name]);
-        } catch (error) {
-            meta.error = error?.message || String(error);
-        }
-
-        return meta;
-    }
-
-
 
     @Tool({
         description: 'Retrieves config schemas for supported processors and injects the shared inputs, outputs, and schemas fields.',
@@ -256,26 +240,20 @@ export class ProcessorExpert {
 
 
 
-    @Tool({
-        description: 'Lists all processor with validation status and processor metadata.',
-        returns: { type: 'array' }
-    })
-    async getProcessors() {
+    getProcessorNameMap() {
         const container = this.getProcessorContainer();
-        let fragments = Array.from(container.querySelectorAll(':scope > code-fragment'));
-        fragments = fragments.sort((a, b) => {
+        const fragments = Array.from(container.querySelectorAll('code-fragment[data-type="text/javascript+babel"]'))
+            .filter(fragmentElement => fragmentElement.id);
+        fragments.sort((a, b) => {
             const aName = a.getAttribute('name') || a.id || '';
             const bName = b.getAttribute('name') || b.id || '';
             return aName.localeCompare(bName);
         });
 
-        const results = [];
-
-        for (const fragmentElement of fragments) {
-            results.push(await this.collectProcessorFragmentMeta(fragmentElement));
-        }
-
-        return results;
+        return Object.fromEntries(fragments.map(fragmentElement => [
+            fragmentElement.id,
+            fragmentElement.getAttribute('name') || 'Unnamed Processor'
+        ]));
     }
 
     @Tool({
@@ -294,7 +272,7 @@ export class ProcessorExpert {
         returns: { type: 'string' }
     })
     getProcessorFragmentName(id) {
-        const fragment = this.getProcessorFragmentById(id);
+        const fragment = processorHarness.getFragment(id);
         return fragment.element.getAttribute('name') || 'Unnamed Processor';
     }
 
@@ -318,7 +296,7 @@ export class ProcessorExpert {
         returns: { type: 'string' }
     })
     updateProcessorFragmentName(id, newName) {
-        const fragment = this.getProcessorFragmentById(id);
+        const fragment = processorHarness.getFragment(id);
         fragment.element.setAttribute('name', newName.trim());
         return `Processor fragment name updated to "${newName.trim()}".`;
     }
@@ -344,28 +322,13 @@ export class ProcessorExpert {
         return await this.readProcessorDefinitionFromFragment(id);
     }
 
-    @Tool({
-        description: 'Validates a processor fragment definition by requiring it and checking structure for ScriptProcessor.',
-        parameters: {
-            type: 'object',
-            properties: {
-                id: {
-                    type: 'string',
-                    description: 'The fragment id of the processor.'
-                }
-            },
-            required: ['id'],
-            additionalProperties: false
-        },
-        returns: { type: 'string' }
-    })
-    async validateProcessorDefinition(id) {
-        const definition = await this.readProcessorDefinitionFromFragment(id);
-        return `Processor "${definition.name}" (${definition.type}) definition is valid.`;
+    @Tool(harnessToolSchemas.validateSource)
+    validateProcessorSource(request) {
+        return processorHarness.validateSource(request);
     }
 
     @Tool({
-        description: 'Updates and validates a processor fragment by writing explicit processor fields: type, name, and options.',
+        description: 'Writes a complete processor definition only for creation or when smaller edits and patches are not viable; requires an expected revision.',
         parameters: {
             type: 'object',
             properties: {
@@ -384,33 +347,20 @@ export class ProcessorExpert {
                 options: {
                     type: 'object',
                     description: 'Processor options object.'
+                },
+                expectedRevision: {
+                    type: 'string',
+                    description: 'Source revision from readProcessorSource, listProcessorSources, or createProcessorFragment.'
                 }
             },
-            required: ['id', 'type', 'name', 'options'],
+            required: ['id', 'type', 'name', 'options', 'expectedRevision'],
             additionalProperties: false
         },
-        returns: { type: 'string' }
+        returns: { type: 'object' }
     })
-    async updateProcessorDefinition(id, type, name, options) {
-        const fragment = this.getProcessorFragmentById(id);
-        const previousSource = fragment.raw;
-        const processorDefinition = {
-            type,
-            name,
-            options
-        };
-        const nextSource = this.serializeProcessorDefinition(processorDefinition);
-
-        fragment.raw = nextSource;
-
-        try {
-            await this.validateProcessorDefinition(id);
-        } catch (error) {
-            fragment.raw = previousSource;
-            throw new Error(`Processor definition update rejected: ${error.message}`);
-        }
-
-        return 'Processor definition updated and validated successfully.';
+    async writeProcessorSource(id, type, name, options, expectedRevision) {
+        const source = this.serializeProcessorDefinition({ type, name, options });
+        return await processorHarness.writeSource({ id, source, expectedRevision });
     }
 
     @Tool({
@@ -428,7 +378,10 @@ export class ProcessorExpert {
         },
         returns: { type: 'object' }
     })
-    createProcessorFragment(fragmentName) {
+    async createProcessorFragment(fragmentName) {
+        if (typeof fragmentName !== 'string' || !fragmentName.trim()) {
+            throw new Error('fragmentName must be a non-empty string.');
+        }
         const container = this.getProcessorContainer();
         const nextFragmentId = `processor-fragment-${crypto.randomUUID()}`;
 
@@ -445,7 +398,8 @@ export class ProcessorExpert {
 
         return {
             fragmentId: nextFragmentId,
-            fragmentName: fragmentName.trim()
+            fragmentName: fragmentName.trim(),
+            revision: await getSourceRevision('')
         };
     }
 
@@ -514,7 +468,7 @@ export class ProcessorExpert {
         const session = window.sessionHistory?.session;
 
         return {
-            processors: await this.getProcessors(),
+            processorNameMap: this.getProcessorNameMap(),
             sessionConnected: !!session,
             historyModelBaseEventSchema: historyModelExpert.getBaseEventSchema(),
             historyModelEventTypes: historyModelExpert.getEventTypes()
@@ -535,9 +489,13 @@ export class ProcessorExpert {
 
             this.createProcessorFragment,
 
-            this.getProcessorDefinition,
-            this.validateProcessorDefinition,
-            this.updateProcessorDefinition,
+            this.listProcessorSources,
+            this.searchProcessorSource,
+            this.readProcessorSource,
+            this.editProcessorSource,
+            this.applyProcessorSourcePatch,
+            this.validateProcessorSource,
+            this.writeProcessorSource,
 
             this.activateProcessor,
             this.deactivateProcessor,
@@ -560,9 +518,10 @@ export class ProcessorExpert {
                     type: 'object',
                     description: 'Base context for this expert call.',
                     properties: {
-                        processors: {
-                            type: 'array',
-                            description: 'Local processor fragments with validation status, metadata, and an active flag indicating if the processor is running on the server.'
+                        processorNameMap: {
+                            type: 'object',
+                            additionalProperties: { type: 'string' },
+                            description: 'The processor name map. Keys are local fragment IDs and values are human-readable fragment names.'
                         },
                         sessionConnected: {
                             type: 'boolean',
@@ -578,7 +537,7 @@ export class ProcessorExpert {
                             description: 'Known event types from the history model.'
                         }
                     },
-                    required: ['processors', 'sessionConnected', 'historyModelBaseEventSchema', 'historyModelEventTypes']
+                    required: ['processorNameMap', 'sessionConnected', 'historyModelBaseEventSchema', 'historyModelEventTypes']
                 }
             },
             required: ['prompt', 'baseContext']
@@ -593,7 +552,6 @@ export class ProcessorExpert {
 
 You help users create, inspect, and edit processors. A processor is a piece of code running on the history model server that processes other events or video feeds and produces new events.
 
-
 ## Input
 
 ### prompt
@@ -603,12 +561,12 @@ You receive a "prompt" string which is the user's request or question. Your prim
 ### baseContext
 
 You receive processor and history context in baseContext:
-- baseContext.processors — all local processor fragments with validation status, metadata, and an 'active' boolean indicating whether the processor is currently running on the server
+- baseContext.processorNameMap — a mapping of local processor fragment IDs to their human-readable fragment names
 - baseContext.sessionConnected — whether the client is connected to a session
 - baseContext.historyModelBaseEventSchema
 - baseContext.historyModelEventTypes
 
-Use this context to target the correct processor and select valid input/output event types. Check each processor's 'active' field to know whether it is already running before activating or deactivating.
+Use the name map to target the correct processor by fragment ID. Read its source with readProcessorSource when you need its exported name, type, inputs, outputs, schemas, script, or prompt. Fragment names are display labels and can differ from exported processor names used on the server. Initial context does not load or validate processor modules or report whether they are running. Source content alone does not establish running status; activation and deactivation tools check the current session before changing it. Use the history context to select valid input/output event types.
 
 
 ## Output
@@ -622,7 +580,9 @@ Use this context to target the correct processor and select valid input/output e
 
 ## Error Handling
 
-- If a requested change would produce an invalid processor structure, fix it before confirming
+- Harness results say whether source was written: written=false means the processor is unchanged; fix the request and resend the complete batch
+- For stale revisions or missing matches, read the relevant current source; for candidate syntax errors, fix the new code without rereading unchanged source
+- written=true with ok=false means the fragment is live but failed to load; repair it immediately using the returned committed revision, unless validation reports source-changed (read again first)
 - If no processor fragment exists yet and the user asks to edit one, create it first
 - If multiple fragments have ambiguous names, use fragment IDs for precise targeting
 
@@ -635,25 +595,46 @@ Use this to retrieve config schemas for ScriptProcessor, AIPromptProcessor, and 
 
 ### createProcessorFragment
 
-Use this to create a new empty processor fragment shell first. Then call updateProcessorDefinition with type, name, and options.
+Use this to create a new empty processor fragment shell first. It returns revision; pass that as expectedRevision to writeProcessorSource with type, name, and options.
 
 ### getProcessorFragmentName / updateProcessorFragmentName
 
 Use when the user asks about or wants to change the human-readable processor fragment name shown in the repository/list UI.
 
-### getProcessorDefinition
+### Editing Harness
 
-Use this to inspect the current processor structure before editing.
+The list/search/read/edit/patch/validate tools require tool arguments with exactly one "request" property whose value is a JSON object: {"request":{"id":"<processor-fragment-id>"}}. Do not JSON.stringify or quote the request object, put its fields at the top level, or nest another request inside it. Source code inside oldString, newString, and diff remains JSON string data with normal escaping. writeProcessorSource uses separate top-level arguments as described below.
+Access is limited to local processors. Prefer editProcessorSource/applyProcessorSourcePatch; use writeProcessorSource only for new processors or when smaller edits are not viable. Preserve unrelated source and comments.
+Use known IDs, read relevant source areas, and batch the change into one write. Aim for 2-4 rounds; trust returned excerpts and validation after success. Local edits do not change running processors; activate/deactivate only when requested.
 
-### validateProcessorDefinition
+#### listProcessorSources
 
-Use this only for explicit validation-only checks when no update is being made.
+Discover source IDs, names, and revisions with {"request":{}} or {"request":{"namePattern":"<name filter>"}}.
 
-### updateProcessorDefinition
+#### searchProcessorSource
 
-Preferred for structured edits. Use this when changing processor name, type, inputs, outputs, schemas, script, or prompt.
-Always pass processor fields as separate arguments: type, name, options.
-This tool already validates the processor definition, so do not call validateProcessorDefinition after a successful update unless the user explicitly requests another validation pass.
+Locate code/text in the raw fragment with {"request":{"ids":["<processor-fragment-id>"],"pattern":"<text to find>"}}; use mode='regex' inside request for combined patterns.
+
+#### readProcessorSource
+
+Read raw fragment source with {"request":{"id":"<processor-fragment-id>"}}; add ranges:[{startLine, endLine}] inside request as needed. Use this to inspect processor details beyond the fragment name and ID supplied in baseContext. Continue read/search pages with {"request":{"cursor":"<nextCursor>"}} only and finish partial lines before copying anchors.
+
+#### editProcessorSource
+
+Batch unique exact oldString/newString replacements against the original source using expectedRevision. Copy text without line numbers and preserve string escapes when editing embedded scripts or prompts. Reread and adjust failed anchors.
+Argument structure: {"request":{"id":"<processor-fragment-id>","expectedRevision":"<revision from read/list>","edits":[{"oldString":"<exact existing source text>","newString":"<replacement source text>"}]}}. Replace placeholders with actual values. If the error says request was a string, resend this object structure with the same edit contents; do not stringify request.
+
+#### applyProcessorSourcePatch
+
+Apply all unified-diff hunks together using expectedRevision, original source positions, and exact context. Optional headers must name source.
+
+#### validateProcessorSource
+
+Use {"request":{"id":"<processor-fragment-id>"}} for validation-only checks; writes validate automatically.
+
+#### writeProcessorSource
+
+Write the entire definition from id, type, name, options, and expectedRevision.
 
 ### activateProcessor
 
@@ -666,6 +647,12 @@ Use this to deactivate (remove) a running processor from the current session. Pa
 ### getEventTypeSchema
 
 Use this to retrieve schemas for one or more event types (pass an array of types) before authoring processor inputs/outputs.
+
+### Targeted Edit Examples
+
+- To change a script condition: readProcessorSource, then editProcessorSource with the returned revision and an exact source replacement preserving string escapes
+- To change several configuration fields: readProcessorSource, then submit all unique replacements in one editProcessorSource call
+- To change a prompt: search/read its fragment source, then editProcessorSource or applyProcessorSourcePatch with the returned revision and matching escaped text
 
 
 
@@ -710,7 +697,7 @@ Authoring notes:
 
 Required options:
 - prompt (string, non-empty)
-- model (string, good default is 'anthropic/claude-haiku-4-5')
+- model (string, good default is 'cavi/small')
 - allowDurationEvents (boolean)
 - allowInstantEvents (boolean)
 - combineStreams (boolean)
@@ -741,7 +728,7 @@ Required options:
 - allowInstantEvents (boolean)
 
 Optional options:
-- model (string, good default is 'anthropic/claude-haiku-4-5')
+- model (string, good default is 'cavi/small')
 
 Input streams for vision processing:
 - 'user.camera.video' for participant camera feed
@@ -826,7 +813,7 @@ Use these templates as your canonical starting point when creating or updating p
     type: 'AIPromptProcessor',
     name: 'exampleAIPromptProcessor',
     options: {
-        model: 'anthropic/claude-haiku-4-5',
+        model: 'cavi/small',
         prompt: 'Summarize each chunk into one concise sentence and include a confidence estimate from 0 to 1.',
         additionalInputContext: 0,
         additionalOutputContext: 0,
