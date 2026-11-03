@@ -10,7 +10,7 @@
 services:
   sessionhistoryserver:
     build: .
-    image: sessionhistoryserver:0.1.151
+    image: sessionhistoryserver:0.1.220
 
     # Either pick host networking:
     network_mode: host

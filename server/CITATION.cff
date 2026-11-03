@@ -14,7 +14,7 @@ authors:
 license: MIT
 repository-code: "https://github.com/Webstrates/Stund"
 url: "https://github.com/Webstrates/Stund"
-version: "0.1.151"
+version: "0.1.220"
 date-released: "2026-10-13"
 abstract: >-
   SessionHistoryServer records collaborative activity as queryable,
@@ -72,7 +72,6 @@ preferred-citation:
       affiliation: "Aarhus University"
   year: 2026
   month: 11
-  day: 2
   conference:
     name: "The 39th Annual ACM Symposium on User Interface Software and Technology (UIST '26)"
     address: "Detroit, MI, USA"
@@ -82,4 +81,4 @@ preferred-citation:
     name: ACM
     address: "New York, NY, USA"
   doi: "10.1145/3830398.3830508"
-  pages: "?"
+  pages: "1-14"

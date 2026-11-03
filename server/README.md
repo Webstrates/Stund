@@ -34,7 +34,7 @@ Two paths to running a server:
 |-----------|---------------|------------|
 | JDK 17 + Maven 3 | compiles and runs the server | Native path only — Docker compiles inside the image |
 | GStreamer 1.x (1.20+ recommended) — the `base`, `good` and `bad` plugin sets plus libnice's `nice` plugin | WebRTC ingest (`webrtcbin` does all of its ICE through libnice) and the server-side recording pipelines | Native path, run only |
-| The TEN VAD library (`libten_vad.so`, Apache-2.0) | voice-activity detection in the audio processors | Native path, run only |
+| The TEN VAD library (`libten_vad.so`, Apache-2.0 with limitations) | voice-activity detection in the audio processors | Native path, run only |
 | MP4Box (GPAC ≥ 2.2) | authors the owner-export MP4 of a session (`/session/{sessionId}/export?type=raw`) | Export only — the Docker image builds it in; on the native path install GPAC ≥ 2.2 (or point `session.mp4boxPath` at the binary) |
 | Node.js with npm — the browser-driven tests also need a Chromium/Chrome | the functional tests (`tests/`) and the API docs (`docs/`), never the server itself | Tests & docs only |
 
@@ -86,7 +86,7 @@ package` works on a bare box. Boot runs the self-test from the prerequisites, th
 ```bash
 mvn validate            # once per machine: registers the vendored jar
 mvn clean package
-java -jar target/SessionHistoryServer-0.1.151.jar
+java -jar target/SessionHistoryServer-0.1.220.jar
 ```
 
 All dependencies resolve from public sources. The `mvn validate` step
@@ -288,7 +288,7 @@ npx mocha          # see tests/README.md for details
 
 `GET /health` serves a small JSON report of the server's self-observations,
 written for any uptime monitor — HTTP 200 when everything is
-green, HTTP 503 when any check is degraded:
+green, HTTP 503 when any check is degraded.
 
 
 ## Session specs
@@ -493,7 +493,7 @@ sudo emerge --ask media-libs/gst-plugins-bad
 ### TEN VAD
 
 The voice-activity detector used by the audio processors comes from the
-TEN framework (Apache-2.0): https://github.com/TEN-framework/ten-vad
+TEN framework (Apache-2.0 with limitations): https://github.com/TEN-framework/ten-vad
 
 The repository ships a prebuilt Linux x86-64 library at
 `lib/Linux/x64/libten_vad.so`. To install it system-wide:
@@ -507,7 +507,7 @@ sudo ldconfig
 Alternatively, keep the library anywhere and point the JVM at it:
 
 ```bash
-java -Djna.library.path=/opt/ten-vad/lib -jar target/SessionHistoryServer-0.1.151.jar
+java -Djna.library.path=/opt/ten-vad/lib -jar target/SessionHistoryServer-0.1.220.jar
 ```
 
 On other architectures (e.g. ARM64) there is no prebuilt and the library
