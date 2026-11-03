@@ -1,0 +1,32 @@
+{
+  "processors": [
+    {
+      "name": "voicedetect0",
+      "type": "VoiceActivationProcessor",
+      "config": {
+        "inputs": {
+          "user\\.(.*)\\.audio": {}
+        }
+      }
+    },
+    {
+      "name": "transcription0",
+      "type": "AITranscriptionProcessor",
+      "config": {
+        "inputs": {
+          "processor.voicedetect": {}
+        }
+      }
+    }
+  ],
+  "models": [
+    {
+      "name": "history",
+      "config": {
+        "inputs": {
+          ".*": {}
+        }
+      }
+    }
+  ]
+}

@@ -1,0 +1,375 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  SessionHistoryServer Build
+  Compiles, bundles the webapp into the JAR, and shades a runnable JAR with
+  Jetty, GStreamer bindings, the OpenAI client, GraalVM polyglot and JSON schema
+  tooling.
+
+  Copyright (c) 2026 Janus Kristensen - CAVI, Center for Advanced
+  Visualization and Interaction - Aarhus University
+  SPDX-License-Identifier: MIT
+-->
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <groupId>dk.cavi</groupId>
+    <artifactId>SessionHistoryServer</artifactId>
+    <version>0.1.220</version>
+    <packaging>jar</packaging>
+
+    <name>SessionHistoryServer</name>
+
+    <licenses>
+        <license>
+            <name>MIT License</name>
+            <url>https://opensource.org/licenses/MIT</url>
+        </license>
+    </licenses>
+
+    <properties>
+        <project.mainClass>dk.cavi.sessionhistory.Main</project.mainClass>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <maven.compiler.source>17</maven.compiler.source>
+        <maven.compiler.target>17</maven.compiler.target>
+        <graalvm.version>25.0.5.0.2</graalvm.version>
+        <jetty.version>12.1.14</jetty.version>
+        <jackson2.version>2.18.12</jackson2.version>
+        <jackson3.version>3.2.4</jackson3.version>
+    </properties>
+
+    <!-- Managed versions for what arrives transitively or must move in
+         lockstep: the Jackson 2.x family reaches the graph from BOTH
+         json-schema-validator and the OpenAI client, pinned here to one
+         advisory-clearing version; the Jackson 3 (tools.jackson) line comes
+         in versionless through the schema generator's parent, pinned by the
+         BOM import below (which also carries jackson-annotations); slf4j-api
+         aligns with the slf4j-jdk14 binding in the dependencies; okhttp is
+         the OpenAI client's HTTP stack, a patch bump only. -->
+    <dependencyManagement>
+        <dependencies>
+            <dependency>
+                <groupId>tools.jackson</groupId>
+                <artifactId>jackson-bom</artifactId>
+                <version>${jackson3.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+            <dependency>
+                <groupId>com.fasterxml.jackson.core</groupId>
+                <artifactId>jackson-databind</artifactId>
+                <version>${jackson2.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.fasterxml.jackson.core</groupId>
+                <artifactId>jackson-core</artifactId>
+                <version>${jackson2.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.fasterxml.jackson.dataformat</groupId>
+                <artifactId>jackson-dataformat-yaml</artifactId>
+                <version>${jackson2.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.fasterxml.jackson.datatype</groupId>
+                <artifactId>jackson-datatype-jdk8</artifactId>
+                <version>${jackson2.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.fasterxml.jackson.datatype</groupId>
+                <artifactId>jackson-datatype-jsr310</artifactId>
+                <version>${jackson2.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.fasterxml.jackson.module</groupId>
+                <artifactId>jackson-module-kotlin</artifactId>
+                <version>${jackson2.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.slf4j</groupId>
+                <artifactId>slf4j-api</artifactId>
+                <version>2.0.20</version>
+            </dependency>
+            <dependency>
+                <groupId>com.squareup.okhttp3</groupId>
+                <artifactId>okhttp</artifactId>
+                <version>4.12.1</version>
+            </dependency>
+        </dependencies>
+    </dependencyManagement>
+
+    <repositories>
+        <!-- In-project Maven repository holding the vendored, LGPL-licensed
+             gst1-java-fixups jars (see libs/LICENSE). Consulted during
+             dependency resolution, so a plain `mvn clean package` resolves
+             them with no bootstrap step and no external repository. -->
+        <repository>
+            <id>project-libs</id>
+            <url>file://${project.basedir}/libs</url>
+        </repository>
+    </repositories>
+
+    <build>
+        <plugins>
+            <!-- Pinned so the local Maven and the Docker builder compile with
+                 the same modern javac binding: left unpinned, Maven 3.8.x
+                 resolves a 2013 compiler release while maven:3.9 uses a
+                 different default. -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-compiler-plugin</artifactId>
+                <version>3.16.0</version>
+            </plugin>
+            <!-- Fallback for platforms where the file:// repository URL
+                 above is not accepted (Windows drive letters on some
+                 Maven versions): installs the vendored jar into the local
+                 repository. Running `mvn validate` once is enough, after
+                 that the build resolves normally. -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-install-plugin</artifactId>
+                <version>3.2.0</version>
+                <executions>
+                    <execution>
+                        <id>install-vendored-gst1-java-fixups</id>
+                        <phase>validate</phase>
+                        <goals>
+                            <goal>install-file</goal>
+                        </goals>
+                        <configuration>
+                            <file>${project.basedir}/libs/dk/cavi/gst1-java-fixups/1.0/gst1-java-fixups-1.0.jar</file>
+                            <pomFile>${project.basedir}/libs/dk/cavi/gst1-java-fixups/1.0/gst1-java-fixups-1.0.pom</pomFile>
+                            <groupId>dk.cavi</groupId>
+                            <artifactId>gst1-java-fixups</artifactId>
+                            <version>1.0</version>
+                            <packaging>jar</packaging>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-resources-plugin</artifactId>
+                <version>3.5.0</version>
+                <executions>
+                    <execution>
+                        <id>copy-webapp</id>
+                        <phase>process-resources</phase>
+                        <goals>
+                            <goal>copy-resources</goal>
+                        </goals>
+                        <configuration>
+                            <outputDirectory>${project.build.outputDirectory}/webapp</outputDirectory>
+                            <resources>
+                                <resource>
+                                    <directory>src/main/webapp</directory>
+                                    <includes>
+                                        <include>**/*</include>
+                                    </includes>
+                                    <filtering>false</filtering>
+                                </resource>
+                            </resources>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+
+            <plugin>
+                <!-- THIRD-PARTY-NOTICES: regenerate the committed file at the
+                     project root on every build. The output format (and the
+                     curated header) lives in src/license/third-party-file-template.ftl;
+                     the shade plugin below embeds the result in the jar as
+                     META-INF/THIRD-PARTY-NOTICES.txt. -->
+                <groupId>org.codehaus.mojo</groupId>
+                <artifactId>license-maven-plugin</artifactId>
+                <version>2.7.1</version>
+                <executions>
+                    <execution>
+                        <id>generate-third-party-notices</id>
+                        <phase>generate-resources</phase>
+                        <goals>
+                            <goal>add-third-party</goal>
+                        </goals>
+                        <configuration>
+                            <outputDirectory>${project.basedir}</outputDirectory>
+                            <thirdPartyFilename>THIRD-PARTY-NOTICES.txt</thirdPartyFilename>
+                            <fileTemplate>${project.basedir}/src/license/third-party-file-template.ftl</fileTemplate>
+                            <!-- regenerate even if the file already exists -->
+                            <force>true</force>
+                            <encoding>UTF-8</encoding>
+                            <!-- do NOT register the output directory as a
+                                 project resource: the file is embedded in
+                                 the jar by the shade transformer below, and
+                                 the implicit registration would put stray
+                                 copies into target/classes and the jar -->
+                            <addOutputDirectoryAsResourceDir>false</addOutputDirectoryAsResourceDir>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+            <plugin>
+                <!-- Multi-release for GraalVM -->
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-shade-plugin</artifactId>
+                <version>3.6.2</version>
+                <executions>
+                    <execution>
+                        <phase>package</phase>
+                        <goals>
+                            <goal>shade</goal>
+                        </goals>
+                        <configuration>
+                            <transformers>
+                                <transformer implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
+                                    <mainClass>${project.mainClass}</mainClass>
+                                    <manifestEntries>
+                                        <Multi-Release>true</Multi-Release>
+                                        <Implementation-Version>${project.version}</Implementation-Version>
+                                    </manifestEntries>
+                                </transformer>
+                                <transformer implementation="org.apache.maven.plugins.shade.resource.ServicesResourceTransformer"/>
+                                <transformer implementation="org.apache.maven.plugins.shade.resource.IncludeResourceTransformer">
+                                    <resource>META-INF/THIRD-PARTY-NOTICES.txt</resource>
+                                    <file>THIRD-PARTY-NOTICES.txt</file>
+                                </transformer>
+                            </transformers>
+                            <filters>
+                                <filter>
+                                    <artifact>*:*</artifact>
+                                    <excludes>
+                                        <exclude>META-INF/*.SF</exclude>
+                                        <exclude>META-INF/*.DSA</exclude>
+                                        <exclude>META-INF/*.RSA</exclude>
+                                        <!-- the license plugin registers its
+                                             default output as a project
+                                             resource; ours is embedded via the
+                                             IncludeResourceTransformer above -->
+                                        <exclude>target/generated-sources/license/*</exclude>
+                                        <!-- a 34-byte THIRD-PARTY.txt that ships
+                                             inside a dependency jar -->
+                                        <exclude>THIRD-PARTY.txt</exclude>
+                                    </excludes>
+                                </filter>
+                            </filters>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+        </plugins>
+    </build>
+
+    <dependencies>
+        <!-- Jetty -->
+        <dependency>
+            <groupId>org.eclipse.jetty</groupId>
+            <artifactId>jetty-server</artifactId>
+            <version>${jetty.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>org.eclipse.jetty.ee10</groupId>
+            <artifactId>jetty-ee10-webapp</artifactId>
+            <version>${jetty.version}</version>
+        </dependency>
+        <!-- The server logs through java.util.logging (installed in
+             Main.configureLogging); this slf4j binding routes Jetty's
+             logging into that same pipeline, so all output shares one
+             format. -->
+        <dependency>
+            <groupId>org.slf4j</groupId>
+            <artifactId>slf4j-jdk14</artifactId>
+            <version>2.0.20</version>
+        </dependency>
+
+        <!-- Server Websockets -->
+        <dependency>
+            <groupId>jakarta.websocket</groupId>
+            <artifactId>jakarta.websocket-api</artifactId>
+            <version>2.1.1</version>
+        </dependency>
+        <dependency>
+            <groupId>org.eclipse.jetty.ee10.websocket</groupId>
+            <artifactId>jetty-ee10-websocket-jakarta-server</artifactId>
+            <version>${jetty.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>org.eclipse.jetty.ee10</groupId>
+            <artifactId>jetty-ee10-annotations</artifactId>
+            <version>${jetty.version}</version>
+        </dependency>
+
+        <!-- Other app-specific stuff -->
+        <dependency>
+            <groupId>com.google.code.gson</groupId>
+            <artifactId>gson</artifactId>
+            <version>2.14.0</version>
+            <type>jar</type>
+        </dependency>
+        <dependency>
+            <groupId>org.freedesktop.gstreamer</groupId>
+            <artifactId>gst1-java-core</artifactId>
+            <version>1.4.0</version>
+        </dependency>
+        <!-- LGPL-3.0-only, vendored under libs/ (resolved through the
+             in-project file:// repository declared above) -->
+        <dependency>
+            <groupId>dk.cavi</groupId>
+            <artifactId>gst1-java-fixups</artifactId>
+            <version>1.0</version>
+        </dependency>
+        <dependency>
+            <groupId>com.openai</groupId>
+            <artifactId>openai-java</artifactId>
+            <version>4.91.0</version>
+        </dependency>
+        <dependency>
+            <groupId>com.jcabi</groupId>
+            <artifactId>jcabi-manifests</artifactId>
+            <version>2.2.0</version>
+            <type>jar</type>
+            <!-- jcabi-log declares mockito-core (and its byte-buddy/objenesis
+                 machinery) at *compile* scope — a test-only dependency that
+                 would otherwise be shaded into the production jar. -->
+            <exclusions>
+                <exclusion>
+                    <groupId>org.mockito</groupId>
+                    <artifactId>mockito-core</artifactId>
+                </exclusion>
+            </exclusions>
+        </dependency>
+
+        <!-- Script execution -->
+        <dependency>
+            <groupId>org.graalvm.polyglot</groupId>
+            <artifactId>polyglot</artifactId>
+            <version>${graalvm.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>org.graalvm.polyglot</groupId>
+            <artifactId>js</artifactId>
+            <version>${graalvm.version}</version>
+            <type>pom</type>
+        </dependency>
+        <dependency>
+            <groupId>com.networknt</groupId>
+            <artifactId>json-schema-validator</artifactId>
+            <version>1.5.9</version>
+        </dependency>
+
+        <!-- Automatic schemas -->
+        <dependency>
+            <groupId>com.github.victools</groupId>
+            <artifactId>jsonschema-generator</artifactId>
+            <version>5.0.0</version>
+        </dependency>
+        <dependency>
+            <groupId>com.github.victools</groupId>
+            <artifactId>jsonschema-module-jackson</artifactId>
+            <version>5.0.0</version>
+        </dependency>
+        <dependency>
+            <groupId>tools.jackson.core</groupId>
+            <artifactId>jackson-databind</artifactId>
+            <version>${jackson3.version}</version>
+            <scope>compile</scope>
+        </dependency>
+    </dependencies>
+</project>

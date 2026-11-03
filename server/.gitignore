@@ -1,0 +1,29 @@
+# Maven build output
+target*/
+dependency-reduced-pom.xml
+
+# Runtime server configuration (carries API keys) - template: config.json.sample
+config.json
+
+# Recorded session data (runtime output — default -Dsession.basePath).
+# The directory itself must survive git (docker-compose bind-mounts
+# ./sessions, and the server checks at startup that it exists and is
+# writable), so the tracked sessions/.keep keeps it in every checkout —
+# while everything recorded into it at runtime stays ignored.
+sessions/*
+!sessions/.keep
+
+# Functional-test dependencies
+tests/node_modules/
+
+# Docs build output
+docs/api/
+docs/node_modules/
+
+# Minted auth tokens (entityKey files — runtime output, default auth.tokenPath).
+# The directory itself must survive git (docker-compose bind-mounts
+# ./tokens, and the server creates and checks it at startup), so the
+# tracked tokens/.keep keeps it in every checkout — while every minted
+# entityKey file stays ignored.
+tokens/*
+!tokens/.keep

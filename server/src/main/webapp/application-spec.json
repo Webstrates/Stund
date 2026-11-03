@@ -1,0 +1,555 @@
+{
+  "processors": [
+    {
+      "name": "application0",
+      "type": "EventStreamProcessor",
+      "config": {
+        "inputs": {
+          "application\\.(.*)": {}
+        },
+        "outputs": {
+          "application.interaction.shape.moved": {
+            "schemaId": "stund://application.interaction.shape.moved.json",
+            "internal": true
+          },
+          "application.interaction.shape.textChanged": {
+            "schemaId": "stund://application.interaction.shape.textChanged.json",
+            "internal": true
+          },
+          "application.interaction.shape.colorChanged": {
+            "schemaId": "stund://application.interaction.shape.colorChanged.json",
+            "internal": true
+          },
+          "application.interaction.shape.created": {
+            "schemaId": "stund://application.interaction.shape.created.json",
+            "internal": false
+          },
+          "application.interaction.shape.deleted": {
+            "schemaId": "stund://application.interaction.shape.deleted.json",
+            "internal": false
+          },
+          "application.state.event": {
+            "schemaId": "stund://application.state.event.json",
+            "internal": false
+          },
+          "application.chat.entry": {
+            "schemaId": "stund://application.chat.entry.json",
+            "internal": false
+          },
+          "application.interaction.document.textChanged": {
+            "schemaId": "stund://application.interaction.document.textChanged.json",
+            "internal": false
+          },
+          "application.chat.step": {
+            "schemaId": "stund://application.chat.step.json",
+            "internal": false
+          },
+          "application.widget.widgetEvent": {
+            "schemaId": "stund://application.widget.widgetEvent.json",
+            "internal": false
+          }
+        },
+        "schemas": {
+          "stund://application.interaction.shape.moved.json": {
+            "$schema": "http://json-schema.org/draft-07/schema#",
+            "description": "Shape moved event data. This is a duration event that tracks shape position changes, batching rapid movements into a single event that ends after 1500ms of inactivity.",
+            "type": "object",
+            "properties": {
+              "shapeId": {
+                "type": "string",
+                "description": "The unique identifier of the shape that was moved"
+              },
+              "shapeType": {
+                "type": "string",
+                "description": "The type of the shape (e.g., 'note', 'text', 'geo', 'draw')"
+              },
+              "xStart": {
+                "type": "number",
+                "description": "The x-coordinate position of the shape at the start of the move"
+              },
+              "yStart": {
+                "type": "number",
+                "description": "The y-coordinate position of the shape at the start of the move"
+              },
+              "xEnd": {
+                "type": "number",
+                "description": "The x-coordinate position of the shape at the end of the move (or during, if tentative is still true on the event)"
+              },
+              "yEnd": {
+                "type": "number",
+                "description": "The y-coordinate position of the shape at the end of the move (or during, if tentative is still true on the event)"
+              },
+              "reason": {
+                "type": "string",
+                "description": "Optional reason for ending the move event (e.g., 'deleted', 'cleanup')"
+              }
+            },
+            "required": [
+              "shapeId",
+              "shapeType",
+              "xStart",
+              "yStart",
+              "xEnd",
+              "yEnd"
+            ],
+            "additionalProperties": false
+          },
+          "stund://application.interaction.shape.textChanged.json": {
+            "$schema": "http://json-schema.org/draft-07/schema#",
+            "description": "Shape text changed event data. This is a duration event that tracks text content changes in shapes, batching rapid edits into a single event that ends after 1500ms of inactivity.",
+            "type": "object",
+            "properties": {
+              "shapeId": {
+                "type": "string",
+                "description": "The unique identifier of the shape whose text was changed"
+              },
+              "shapeType": {
+                "type": "string",
+                "description": "The type of the shape (e.g., 'note', 'text', 'geo')"
+              },
+              "richTextStart": {
+                "type": "object",
+                "description": "The rich text content of the shape at the start of the editing session"
+              },
+              "richTextEnd": {
+                "type": "object",
+                "description": "The rich text content of the shape at the end of the editing session (or during if tentative is still true on the event)"
+              },
+              "reason": {
+                "type": "string",
+                "description": "Optional reason for ending the text change event (e.g., 'deleted', 'cleanup')"
+              }
+            },
+            "required": [
+              "shapeId",
+              "shapeType",
+              "richTextStart",
+              "richTextEnd"
+            ],
+            "additionalProperties": false
+          },
+          "stund://application.interaction.shape.colorChanged.json": {
+            "$schema": "http://json-schema.org/draft-07/schema#",
+            "description": "Shape color changed event data. This is an instant event triggered when a shape's color property changes.",
+            "type": "object",
+            "properties": {
+              "shapeId": {
+                "type": "string",
+                "description": "The unique identifier of the shape whose color was changed"
+              },
+              "shapeType": {
+                "type": "string",
+                "description": "The type of the shape (e.g., 'note', 'text', 'geo', 'draw')"
+              },
+              "colorStart": {
+                "type": "string",
+                "description": "The color of the shape before the change"
+              },
+              "colorEnd": {
+                "type": "string",
+                "description": "The color of the shape after the change"
+              }
+            },
+            "required": [
+              "shapeId",
+              "shapeType",
+              "colorStart",
+              "colorEnd"
+            ],
+            "additionalProperties": false
+          },
+          "stund://application.interaction.shape.created.json": {
+            "$schema": "http://json-schema.org/draft-07/schema#",
+            "description": "Schema for shape created event data.",
+            "type": "object",
+            "properties": {
+              "shape": {
+                "$ref": "stund://shape.json",
+                "description": "The shape that was created"
+              }
+            },
+            "required": [
+              "shape"
+            ],
+            "additionalProperties": false
+          },
+          "stund://application.interaction.shape.deleted.json": {
+            "$schema": "http://json-schema.org/draft-07/schema#",
+            "description": "Schema for shape deleted event data.",
+            "type": "object",
+            "properties": {
+              "shape": {
+                "$ref": "stund://shape.json",
+                "description": "The shape that was deleted"
+              }
+            },
+            "required": [
+              "shape"
+            ],
+            "additionalProperties": false
+          },
+          "stund://application.state.event.json": {
+            "$schema": "http://json-schema.org/draft-07/schema#",
+            "description": "Schema for the state event data that captures all shapes in a canvas.",
+            "type": "object",
+            "properties": {
+              "shapes": {
+                "type": "array",
+                "description": "Array of all shapes currently on the canvas",
+                "items": {
+                  "$ref": "stund://shape.json"
+                }
+              }
+            },
+            "required": [
+              "shapes"
+            ],
+            "additionalProperties": false
+          },
+          "stund://application.chat.entry.json": {
+            "$schema": "http://json-schema.org/draft-07/schema#",
+            "description": "Schema for a finalized chat entry instant event.",
+            "type": "object",
+            "properties": {
+              "chatId": {
+                "type": "string",
+                "description": "The chat/tab identifier that produced the entry."
+              },
+              "chatShared": {
+                "type": "boolean",
+                "description": "Whether the entry came from a shared (persisted) chat."
+              },
+              "entryId": {
+                "type": "string",
+                "description": "The unique identifier of the chat entry."
+              },
+              "entryIndex": {
+                "type": "integer",
+                "description": "Index of this entry within the chat for ordering (1-based)."
+              },
+              "type": {
+                "type": "string",
+                "description": "The entry role/type (for example 'user' or 'assistant')."
+              },
+              "status": {
+                "type": "string",
+                "enum": [
+                  "completed",
+                  "cancelled",
+                  "exception"
+                ],
+                "description": "Final status of the entry."
+              },
+              "author": {
+                "type": "string",
+                "description": "Display author of the chat entry."
+              },
+              "content": {
+                "type": "string",
+                "description": "The finalized entry content."
+              },
+              "imageContext": {
+                "type": "array",
+                "description": "Image attachments associated with the chat entry.",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "description": "Stable image identifier within the entry."
+                    },
+                    "name": {
+                      "type": "string",
+                      "description": "Display name of the attached image."
+                    },
+                    "mimeType": {
+                      "type": "string",
+                      "description": "MIME type for the image data."
+                    },
+                    "sizeBytes": {
+                      "type": [
+                        "integer",
+                        "null"
+                      ],
+                      "description": "Optional image size in bytes."
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "name",
+                    "mimeType",
+                    "sizeBytes"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              "shapeContext": {
+                "type": "array",
+                "description": "Shape attachments associated with the chat entry.",
+                "items": {
+                  "$ref": "stund://shape.json"
+                }
+              },
+              "stepCount": {
+                "type": "integer",
+                "description": "Number of execution steps emitted for this entry."
+              }
+            },
+            "required": [
+              "chatId",
+              "chatShared",
+              "entryId",
+              "entryIndex",
+              "type",
+              "status",
+              "author",
+              "content",
+              "imageContext",
+              "shapeContext",
+              "stepCount"
+            ],
+            "additionalProperties": false
+          },
+          "stund://application.interaction.document.textChanged.json": {
+            "$schema": "http://json-schema.org/draft-07/schema#",
+            "description": "Schema for document text changed event. This is a duration event that tracks text changes in document fragments, batching rapid edits into a single event that ends after 1500ms of inactivity.",
+            "type": "object",
+            "properties": {
+              "shapeId": {
+                "type": "string",
+                "description": "The unique identifier of the document shape being edited"
+              },
+              "documentFragmentId": {
+                "type": "string",
+                "description": "The fragment identifier backing the edited document"
+              },
+              "documentName": {
+                "type": "string",
+                "description": "The resolved display name of the edited document"
+              },
+              "editSource": {
+                "type": "string",
+                "enum": [
+                  "canvas",
+                  "fullscreen"
+                ],
+                "description": "Where the document edit was performed"
+              },
+              "textStart": {
+                "type": "string",
+                "description": "The document text at the start of the tracked editing session"
+              },
+              "textEnd": {
+                "type": "string",
+                "description": "The document text at the end of the tracked editing session"
+              },
+              "reason": {
+                "type": "string",
+                "description": "Optional reason for ending the text change event (e.g., 'edit-mode-exit', 'deleted', 'cleanup')"
+              }
+            },
+            "required": [
+              "shapeId",
+              "documentFragmentId",
+              "documentName",
+              "editSource",
+              "textStart",
+              "textEnd"
+            ],
+            "additionalProperties": false
+          },
+          "stund://application.chat.step.json": {
+            "$schema": "http://json-schema.org/draft-07/schema#",
+            "description": "Schema for a single execution/progress step instant event.",
+            "type": "object",
+            "properties": {
+              "chatId": {
+                "type": "string",
+                "description": "The chat/tab identifier that produced the entry."
+              },
+              "entryId": {
+                "type": "string",
+                "description": "The unique identifier of the chat entry this step belongs to."
+              },
+              "entryIndex": {
+                "type": "integer",
+                "description": "Index of the parent entry for ordering (1-based)."
+              },
+              "stepIndex": {
+                "type": "integer",
+                "description": "Index of this step within the entry for ordering (1-based)."
+              },
+              "type": {
+                "type": "string",
+                "description": "Step type identifier (for example stack/tool/slop states)."
+              },
+              "description": {
+                "type": "string",
+                "description": "Step description (for example which tool or slop was used)."
+              },
+              "arguments": {
+                "type": "array",
+                "description": "Optional tool/slop call arguments.",
+                "items": {}
+              },
+              "returnValue": {
+                "description": "Optional tool/slop return value."
+              },
+              "exception": {
+                "type": "string",
+                "description": "Optional exception message for exception steps."
+              }
+            },
+            "required": [
+              "chatId",
+              "entryId",
+              "entryIndex",
+              "stepIndex",
+              "type",
+              "description"
+            ],
+            "additionalProperties": false
+          },
+          "stund://application.widget.widgetEvent.json": {
+            "$schema": "http://json-schema.org/draft-07/schema#",
+            "description": "Schema for widget-defined instant events emitted by widgets.",
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string",
+                "description": "Widget-defined event type identifier."
+              },
+              "data": {
+                "description": "Widget-defined payload. Can be any JSON-serializable value."
+              }
+            },
+            "required": [
+              "type",
+              "data"
+            ],
+            "additionalProperties": false
+          },
+          "stund://shape.json": {
+            "$schema": "http://json-schema.org/draft-07/schema#",
+            "$id": "stund://shape.json",
+            "description": "Schema for cleaned TLDraw shape data used in meeting recorder history.",
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "description": "Unique identifier for the shape, must always start with 'shape:'"
+              },
+              "type": {
+                "type": "string",
+                "description": "The type of shape (e.g., 'note', 'text', 'geo', 'image', 'draw', 'ScreenStream', 'VideoStream')"
+              },
+              "x": {
+                "type": "number",
+                "description": "The x-coordinate position of the shape on the canvas"
+              },
+              "y": {
+                "type": "number",
+                "description": "The y-coordinate position of the shape on the canvas"
+              },
+              "rotation": {
+                "type": "number",
+                "description": "The rotation angle of the shape in radians"
+              },
+              "opacity": {
+                "type": "number",
+                "description": "The opacity of the shape, from 0 (transparent) to 1 (opaque)",
+                "minimum": 0,
+                "maximum": 1
+              },
+              "props": {
+                "type": "object",
+                "description": "Shape-specific properties that vary by shape type",
+                "properties": {
+                  "color": {
+                    "type": "string",
+                    "description": "The color of the shape (used in basic shapes and notes)"
+                  },
+                  "richText": {
+                    "type": "object",
+                    "description": "Rich text content for shapes that contain text (notes, text, and geo shapes), you should never update or set this field directly, it is only to be read"
+                  },
+                  "text": {
+                    "type": "string",
+                    "description": "Plain text content for shapes that contain text (notes, text, and geo shapes), will be converted to richText automatically, you cannot read this field"
+                  },
+                  "w": {
+                    "type": "number",
+                    "description": "The width of the shape"
+                  },
+                  "h": {
+                    "type": "number",
+                    "description": "The height of the shape"
+                  },
+                  "url": {
+                    "type": "string",
+                    "description": "URL associated with the shape (for images or links)"
+                  },
+                  "assetId": {
+                    "type": "string",
+                    "description": "Reference to an asset in the TLDraw asset store (for images)"
+                  },
+                  "client": {
+                    "type": "string",
+                    "description": "Client identifier for video and screen stream shapes"
+                  },
+                  "userName": {
+                    "type": "string",
+                    "description": "User name associated with video and screen stream shapes"
+                  },
+                  "sourceFragmentId": {
+                    "type": "string",
+                    "description": "The ID of the code fragment that is the source for this widget shape. Never set this manually."
+                  }
+                },
+                "additionalProperties": false
+              }
+            },
+            "required": [
+              "id",
+              "type",
+              "x",
+              "y",
+              "rotation",
+              "opacity",
+              "props"
+            ],
+            "additionalProperties": false
+          }
+        }
+      }
+    },
+    {
+      "name": "voicedetect0",
+      "type": "VoiceActivationProcessor",
+      "config": {
+        "inputs": {
+          "user\\.(.*)\\.audio": {}
+        }
+      }
+    },
+    {
+      "name": "transcription0",
+      "type": "AITranscriptionProcessor",
+      "config": {
+        "inputs": {
+          "processor.voicedetect": {}
+        }
+      }
+    }
+  ],
+  "models": [
+    {
+      "name": "history",
+      "config": {
+        "inputs": {
+          ".*": {}
+        }
+      }
+    }
+  ]
+}

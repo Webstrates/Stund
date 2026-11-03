@@ -1,0 +1,28 @@
+# SessionHistoryServer Container Compose
+# Builds the image (Dockerfile) and runs the server with a persistent
+# sessions directory on port 3001, and publishes the RTP port range so
+# ingest clients on other machines can reach the WebRTC media.
+#
+# Copyright (c) 2026 Janus Kristensen - CAVI, Center for Advanced
+# Visualization and Interaction - Aarhus University
+# SPDX-License-Identifier: MIT
+
+services:
+  sessionhistoryserver:
+    build: .
+    image: sessionhistoryserver:0.1.151
+
+    # Either pick host networking:
+    network_mode: host
+    # or map all the ports
+    #ports:
+    #  - "3001:3001"
+    #  - "${RTP_PORT_RANGE:-60000-61000}:${RTP_PORT_RANGE:-60000-61000}/udp"
+    
+    environment:
+      JAVA_TOOL_OPTIONS: "-Djetty.port=3001 -Dsession.basePath=/app/sessions"
+    volumes:
+      - ./sessions:/app/sessions
+      - ./tokens:/app/tokens
+      - ./config.json:/app/config.json:ro
+    restart: unless-stopped

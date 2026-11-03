@@ -1,0 +1,13 @@
+# SessionHistoryServer Docker Ignore
+# Allowlist: the image build only needs the project sources and the
+# POM - the server JAR and the TEN VAD library are built inside the
+# image, so nothing else is sent to the builder.
+#
+# Copyright (c) 2026 Janus Kristensen - CAVI, Center for Advanced
+# Visualization and Interaction - Aarhus University
+# SPDX-License-Identifier: MIT
+
+*
+!src
+!pom.xml
+!libs

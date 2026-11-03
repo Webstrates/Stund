@@ -1,0 +1,91 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  gst1-java-fixups POM
+  Standalone build - no parent POM, resolves its only dependency
+  (gst1-java-core) from Maven Central.
+
+  Copyright (c) 2026 Janus Kristensen - CAVI, Center for Advanced
+  Visualization and Interaction - Aarhus University
+  SPDX-License-Identifier: LGPL-3.0-only
+-->
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <groupId>dk.cavi</groupId>
+    <artifactId>gst1-java-fixups</artifactId>
+    <version>1.0</version>
+
+    <name>gst1-java-fixups</name>
+    <description>Add-on bindings for gst1-java-core: WebRTC data channel support
+        (string and binary), GBytes and WebRTCICE wrappers. A CAVI variant of
+        https://github.com/gstreamer-java/gst1-java-core/pull/271 that registers
+        the new types via the ServiceLoader instead of patching gst1-java-core.</description>
+    <packaging>jar</packaging>
+
+    <licenses>
+        <license>
+            <name>GNU Lesser General Public License version 3 only</name>
+            <url>https://www.gnu.org/licenses/lgpl-3.0.txt</url>
+            <distribution>repo</distribution>
+        </license>
+    </licenses>
+
+    <dependencies>
+        <dependency>
+            <groupId>org.freedesktop.gstreamer</groupId>
+            <artifactId>gst1-java-core</artifactId>
+            <version>1.4.0</version>
+        </dependency>
+    </dependencies>
+
+    <properties>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <maven.compiler.source>11</maven.compiler.source>
+        <maven.compiler.target>11</maven.compiler.target>
+    </properties>
+
+    <build>
+        <!-- keep the default resources (META-INF/services) and additionally
+             carry the license text inside the jars -->
+        <resources>
+            <resource>
+                <directory>src/main/resources</directory>
+            </resource>
+            <resource>
+                <directory>${project.basedir}</directory>
+                <includes>
+                    <include>LICENSE</include>
+                </includes>
+            </resource>
+        </resources>
+        <plugins>
+            <!-- pinned so the build does not depend on whatever ancient
+                 default the local Maven falls back to -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-compiler-plugin</artifactId>
+                <version>3.8.1</version>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-jar-plugin</artifactId>
+                <version>3.3.0</version>
+            </plugin>
+            <!-- attach a -sources.jar for LGPL corresponding-source distribution -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-source-plugin</artifactId>
+                <version>3.3.1</version>
+                <executions>
+                    <execution>
+                        <id>attach-sources</id>
+                        <goals>
+                            <goal>jar-no-fork</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+        </plugins>
+    </build>
+
+</project>

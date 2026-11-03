@@ -1,0 +1,19 @@
+{
+    "webrtc": {
+        "iceServers": [
+            "stun://stun.l.google.com:19302"
+        ],
+        "minRTPPort": 60000,
+        "maxRTPPort": 61000
+    },
+    "ai": {
+        "defaultModel": "gpt-4o-mini",
+        "defaultTranscriptionModel": "whisper-1"
+    },
+    "openAIConnections": {
+        "default": {
+            "url": "https://api.openai.com/v1/",
+            "key": "sk-YOUR-API-KEY"
+        }
+    }
+}

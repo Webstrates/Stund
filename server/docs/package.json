@@ -1,0 +1,14 @@
+{
+  "name": "sessionhistory-docs",
+  "version": "0.1.0",
+  "private": true,
+  "description": "API documentation build for SessionHistoryServer: JSDoc over the bundled session.js client library (same setup as the Codestrates API docs).",
+  "scripts": {
+    "docs": "jsdoc -c jsdoc.conf.json -t node_modules/jsdoc-baseline ../src/main/webapp/session.js -d api",
+    "serve": "npx --yes http-server api -p 3002 -c-1"
+  },
+  "devDependencies": {
+    "jsdoc": "^3.6.11",
+    "jsdoc-baseline": "^0.1.5"
+  }
+}

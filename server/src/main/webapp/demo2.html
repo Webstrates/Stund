@@ -1,0 +1,1152 @@
+<!DOCTYPE html>
+<!--
+  SessionHistoryServer — bundled demo page
+
+  A single-file, zero-dependency demo of what the server does: authorize
+  with the master password to obtain an entityKey, then join (or create) a
+  session from any number of browser windows, watch synchronized events
+  arrive live (tentative duration events grow and close in real time),
+  click any event — in the feed or on the timeline — to inspect its
+  details, record camera/microphone/screen over WebRTC into Matroska
+  tracks, add and remove processors — including sandboxed JavaScript
+  processors that derive new events — and replay the whole timeline
+  afterwards. The same model subscription serves the live tail and the
+  replay.
+
+  The page uses the bundled client library (session.js) and nothing else:
+  no CDN, no framework, no external font — every byte is served by the
+  SessionHistoryServer itself.
+
+  Copyright (c) 2026 Janus Kristensen - CAVI, Center for Advanced
+  Visualization and Interaction - Aarhus University
+  SPDX-License-Identifier: MIT
+-->
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>SessionHistory — live session recording &amp; replay</title>
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='16' r='13' fill='%232dd4bf'/%3E%3Ccircle cx='16' cy='16' r='5' fill='%230d1117'/%3E%3C/svg%3E">
+    <script src="session.js"></script>
+    <style>
+        /* ── foundation ─────────────────────────────────────────────── */
+        :root {
+            --bg: #0d1117;
+            --panel: #151b23;
+            --panel-2: #1b2330;
+            --line: #26303d;
+            --text: #d7dee8;
+            --muted: #8b98a9;
+            --accent: #2dd4bf;
+            --accent-2: #a78bfa;
+            --danger: #f87171;
+            --mono: ui-monospace, "SF Mono", "Cascadia Mono", Menlo, Consolas, monospace;
+        }
+        * { box-sizing: border-box; }
+        html, body { margin: 0; padding: 0; background: var(--bg); color: var(--text); }
+        body {
+            font: 14px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+            min-height: 100vh;
+        }
+        h1 { font-size: 18px; margin: 0; font-weight: 600; letter-spacing: .3px; }
+        h2 { font-size: 12px; margin: 0 0 10px; text-transform: uppercase; letter-spacing: 1.2px; color: var(--muted); }
+        button {
+            font: inherit; color: var(--text); background: var(--panel-2);
+            border: 1px solid var(--line); border-radius: 6px;
+            padding: 6px 12px; cursor: pointer; transition: border-color .15s, background .15s;
+        }
+        button:hover { border-color: var(--accent); }
+        button:disabled { opacity: .45; cursor: default; }
+        button.primary { background: var(--accent); color: #062722; border-color: transparent; font-weight: 600; }
+        button.primary:hover { filter: brightness(1.08); }
+        button.danger { border-color: #5c2b2b; color: var(--danger); }
+        input, select, textarea {
+            font: inherit; color: var(--text); background: #0b0f15;
+            border: 1px solid var(--line); border-radius: 6px; padding: 6px 8px; width: 100%;
+        }
+        textarea { font-family: var(--mono); font-size: 12px; resize: vertical; }
+        code, .mono { font-family: var(--mono); font-size: 12px; }
+        a { color: var(--accent); }
+
+        /* ── layout ────────────────────────────────────────────────── */
+        header {
+            display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
+            padding: 12px 18px; border-bottom: 1px solid var(--line);
+            background: linear-gradient(180deg, #101722, var(--bg));
+            position: sticky; top: 0; z-index: 10;
+        }
+        header .brand { display: flex; align-items: baseline; gap: 10px; }
+        header .brand .logo { font-size: 20px; }
+        header .brand .sub { color: var(--muted); font-size: 12px; }
+        #session-bar { display: flex; align-items: center; gap: 8px; margin-left: auto; flex-wrap: wrap; }
+        .pill {
+            display: inline-flex; align-items: center; gap: 7px;
+            border: 1px solid var(--line); border-radius: 999px; padding: 4px 12px;
+            font-size: 12px; color: var(--muted); background: var(--panel);
+        }
+        .pill b { color: var(--text); font-weight: 600; }
+        .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); flex: none; }
+        .dot.live { background: var(--accent); box-shadow: 0 0 8px var(--accent); }
+        .dot.rec { background: var(--danger); box-shadow: 0 0 8px var(--danger); animation: pulse 1.2s infinite; }
+        @keyframes pulse { 50% { opacity: .4; } }
+
+        main { padding: 18px; max-width: 1500px; margin: 0 auto; }
+        .grid { display: grid; grid-template-columns: 360px minmax(0, 1fr) 340px; gap: 16px; align-items: start; }
+        @media (max-width: 1100px) { .grid { grid-template-columns: 1fr; } }
+        .card {
+            background: var(--panel); border: 1px solid var(--line);
+            border-radius: 10px; padding: 14px; margin-bottom: 16px;
+        }
+
+        /* ── landing ───────────────────────────────────────────────── */
+        #landing { max-width: 640px; margin: 8vh auto 0; }
+        #landing .hero { text-align: center; margin-bottom: 26px; }
+        #landing .hero .logo { font-size: 44px; }
+        #landing .hero p { color: var(--muted); margin: 8px 0 0; }
+        .join-row { display: flex; gap: 10px; margin-top: 12px; }
+        .join-row input { flex: 1; }
+        #landing .hint { color: var(--muted); font-size: 12px; margin-top: 18px; line-height: 1.7; }
+        .access-row { display: flex; gap: 10px; align-items: center; margin-bottom: 10px; }
+        .access-row label { color: var(--muted); font-size: 12px; flex: none; }
+        .access-row input { flex: 1; width: auto; min-width: 90px; }
+        #entity-name { font-family: var(--mono); }
+        #access-error { color: var(--danger); font-size: 12px; min-height: 18px; margin: 8px 0 0; }
+        #access-card .join-row { justify-content: center; }
+        #session-card .identity {
+            display: flex; align-items: baseline; gap: 8px; margin-bottom: 4px;
+            font-size: 12px; color: var(--muted);
+        }
+        #session-card .identity b { font-family: var(--mono); font-size: 13px; }
+
+        /* ── event feed ─────────────────────────────────────────────── */
+        #feed-filter { margin-bottom: 8px; }
+        #feed { height: 420px; overflow-y: auto; border: 1px solid var(--line); border-radius: 8px; background: #0b0f15; }
+        #feed .row {
+            display: flex; gap: 8px; align-items: baseline; padding: 5px 10px;
+            border-bottom: 1px solid #151c26; font-family: var(--mono); font-size: 11.5px;
+        }
+        #feed .row.tentative { opacity: .75; border-left: 2px dashed var(--accent-2); }
+        #feed .row { cursor: pointer; }
+        #feed .row:hover { background: #10161f; }
+        #feed .row.selected { background: #141c28; box-shadow: inset 3px 0 0 var(--accent-2); }
+        #feed .row .t { color: var(--muted); flex: none; }
+        #feed .row .who { flex: none; font-weight: 600; }
+        #feed .row .what { color: var(--accent); flex: none; }
+        #feed .row .data { color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; }
+        #feed .empty { color: var(--muted); text-align: center; padding: 40px 20px; font-size: 12px; }
+        #feed-count { color: var(--muted); font-size: 11px; margin-top: 6px; font-family: var(--mono); }
+
+        /* ── sender ─────────────────────────────────────────────────── */
+        .field { margin-bottom: 8px; }
+        .field label { display: block; font-size: 11px; color: var(--muted); margin-bottom: 3px; }
+        #hold-button {
+            width: 100%; padding: 14px; font-weight: 600; letter-spacing: .4px;
+            background: linear-gradient(180deg, #3b2a55, #2a1f3d); border-color: #4c3a6b;
+        }
+        #hold-button:active, #hold-button.held {
+            background: linear-gradient(180deg, var(--accent-2), #7c5cd6); color: #fff;
+            box-shadow: 0 0 18px rgba(167, 139, 250, .5);
+        }
+        .hint-small { color: var(--muted); font-size: 11px; margin-top: 6px; }
+
+        /* ── timeline ──────────────────────────────────────────────── */
+        #timeline-card { padding-bottom: 8px; }
+        #timeline-wrap { position: relative; }
+        #timeline { width: 100%; height: 220px; display: block; background: #0b0f15; border-radius: 8px; cursor: crosshair; }
+        #timeline-legend { display: flex; gap: 14px; color: var(--muted); font-size: 11px; margin-top: 6px; flex-wrap: wrap; }
+        #timeline-legend .swatch { display: inline-block; width: 10px; height: 10px; border-radius: 3px; vertical-align: -1px; margin-right: 4px; }
+        #timeline-legend .tentative-swatch { border: 1px dashed var(--accent-2); background: transparent; }
+
+        /* ── event details (underneath the timeline) ──────────────── */
+        #event-details {
+            margin-top: 12px; border: 1px solid var(--line); border-radius: 8px;
+            background: #0b0f15; padding: 10px 12px; position: relative;
+        }
+        #event-details .details-head { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+        #event-details .details-type { font-size: 13px; font-weight: 600; word-break: break-all; }
+        #event-details .pill { font-size: 11px; padding: 2px 10px; }
+        #event-details .pill.tentative-pill { border-color: var(--accent-2); color: var(--accent-2); }
+        #detail-close {
+            margin-left: auto; padding: 2px 10px; font-size: 14px; line-height: 1.2; border-radius: 6px;
+        }
+        #event-details dl { display: grid; grid-template-columns: max-content 1fr; gap: 4px 14px; margin: 0 0 8px; }
+        #event-details dt { color: var(--muted); font-size: 11px; }
+        #event-details dd { margin: 0; font-family: var(--mono); font-size: 11.5px; word-break: break-all; }
+        #event-details .details-label { color: var(--muted); font-size: 10px; text-transform: uppercase; letter-spacing: 1px; margin: 8px 0 4px; }
+        #event-details pre {
+            margin: 0; padding: 8px 10px; background: #070b10; border: 1px solid #151c26; border-radius: 6px;
+            font-family: var(--mono); font-size: 11.5px; overflow-x: auto; max-height: 220px; overflow-y: auto;
+        }
+
+        /* ── replay ────────────────────────────────────────────────── */
+        #replay-bar { display: flex; gap: 10px; align-items: center; margin-top: 10px; flex-wrap: wrap; }
+        #replay-progress { flex: 1; height: 6px; border-radius: 3px; background: #212a37; overflow: hidden; min-width: 120px; }
+        #replay-progress .fill { height: 100%; width: 0%; background: linear-gradient(90deg, var(--accent), var(--accent-2)); }
+        #replay-status { font-family: var(--mono); font-size: 11px; color: var(--muted); min-width: 150px; }
+
+        /* ── media ─────────────────────────────────────────────────── */
+        #media-buttons { display: flex; gap: 8px; flex-wrap: wrap; }
+        #media-buttons button { flex: 1; min-width: 90px; }
+        #media-buttons button.active { border-color: var(--danger); color: var(--danger); }
+        #recordings { margin-top: 10px; }
+        #recordings .rec-row {
+            display: flex; align-items: center; gap: 8px; font-family: var(--mono); font-size: 11px;
+            padding: 6px 8px; border: 1px solid var(--line); border-radius: 6px; margin-bottom: 6px; background: #0b0f15;
+        }
+        #recordings .rec-row .name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--muted); }
+
+        /* ── processors ────────────────────────────────────────────── */
+        #processor-list .proc-row {
+            display: flex; align-items: center; gap: 8px; padding: 6px 4px;
+            border-bottom: 1px solid #151c26; font-size: 12px;
+        }
+        #processor-list .proc-row .name { flex: 1; }
+        #processor-list .proc-row .type { color: var(--muted); font-family: var(--mono); font-size: 11px; }
+        #script-editor { height: 150px; margin-top: 8px; }
+        #processors-hint { color: var(--muted); font-size: 11px; line-height: 1.6; margin-top: 8px; }
+
+        footer {
+            text-align: center; color: var(--muted); font-size: 11px;
+            padding: 24px 16px 32px; border-top: 1px solid var(--line); margin-top: 24px;
+        }
+
+        /* ── toasts ────────────────────────────────────────────────── */
+        #toasts { position: fixed; bottom: 18px; right: 18px; z-index: 100; display: flex; flex-direction: column; gap: 8px; max-width: 380px; }
+        .toast {
+            background: var(--panel-2); border: 1px solid var(--line); border-left: 3px solid var(--accent);
+            border-radius: 8px; padding: 10px 14px; font-size: 12px; box-shadow: 0 8px 24px rgba(0,0,0,.5);
+            animation: slide-in .2s ease-out;
+        }
+        .toast.error { border-left-color: var(--danger); }
+        @keyframes slide-in { from { transform: translateX(30px); opacity: 0; } }
+
+        .hidden { display: none !important; }
+    </style>
+</head>
+<body>
+
+<header>
+    <div class="brand">
+        <span class="logo">⏺</span>
+        <h1>SessionHistory</h1>
+        <span class="sub">live session recording &amp; replay</span>
+    </div>
+    <div id="session-bar" data-testid="session-bar">
+        <span class="pill" id="entity-pill"><span class="dot"></span><b id="entity-name-header">—</b></span>
+        <span class="pill" id="session-pill" title="click to copy the full session id">session <b id="session-id-short">—</b></span>
+        <span class="pill" id="rec-pill" data-testid="rec-state"><span class="dot"></span><span id="rec-state-text">idle</span></span>
+        <button id="start-session" class="hidden" data-testid="start-session">Start session</button>
+        <button id="stop-session" class="hidden" data-testid="stop-session">End session</button>
+    </div>
+</header>
+
+<main>
+    <!-- ── landing: authorize first, then create or join ───────────── -->
+    <section id="landing" data-testid="landing">
+        <div class="hero hidden" id="landing-hero">
+            <div class="logo">⏺</div>
+            <h1 style="font-size: 28px;">Record a session</h1>
+            <p>Events, camera, microphone and screen — synchronized, tentative-while-live,<br>replayable through the same API.</p>
+        </div>
+
+        <!-- the authorization box: all a visitor without an entityKey sees -->
+        <div class="card" id="access-card" data-testid="access-card">
+            <h2>Get access</h2>
+            <div class="access-row">
+                <label for="entity-name">You are</label>
+                <input id="entity-name" data-testid="entity-input" autocomplete="off" spellcheck="false">
+            </div>
+            <div class="access-row">
+                <label for="master-password" title="The master password from the server's config.json — needed once per entity to obtain the entityKey the server demands">password</label>
+                <input id="master-password" type="password" data-testid="master-password" autocomplete="off" placeholder="master password">
+            </div>
+            <div class="join-row">
+                <button id="get-access" class="primary" data-testid="get-access">Get Access</button>
+            </div>
+            <p id="access-error" data-testid="access-error" role="alert"></p>
+            <p class="hint">
+                The server demands an entityKey for every session request. Pick a name for
+                yourself (each window of this demo is its own entity) and authorize once
+                with the master password. The browser remembers one key at a time — the
+                most recent login wins, so a second window that authorizes makes the
+                first authorize again after its next reload. Until then, this page offers
+                nothing but this box.
+            </p>
+        </div>
+
+        <!-- authorized: the session options -->
+        <div class="card hidden" id="session-card" data-testid="session-card">
+            <div class="identity">You are <b id="entity-known">—</b> · <span style="color:var(--accent);">authorized</span></div>
+            <div class="join-row" style="margin-top: 0;">
+                <button id="create-session" class="primary" data-testid="create-session" style="flex:none;">Create new session</button>
+                <input id="join-session" data-testid="join-input" placeholder="…or paste a session id">
+                <button id="join-button" data-testid="join-button" style="flex:none;">Join</button>
+            </div>
+            <p class="hint">
+                Open this page in a second window and join the same session id — every event
+                flows to all participants live. Click an event in the feed or on the
+                timeline to inspect its details. The whole page is one file with zero
+                external dependencies; it talks to the server through the bundled
+                <code>session.js</code> client library.
+            </p>
+        </div>
+    </section>
+
+    <!-- ── the app ────────────────────────────────────────────────── -->
+    <section id="app" class="hidden" data-testid="app">
+        <div class="grid">
+            <!-- left column -->
+            <div>
+                <div class="card">
+                    <h2>Live event feed</h2>
+                    <input id="feed-filter" placeholder="filter by event type (regex), e.g. ^application.demo">
+                    <div id="feed" data-testid="feed"><div class="empty">no events yet — send one, or start an ingest stream</div></div>
+                    <div id="feed-count">0 events · 0 types</div>
+                </div>
+                <div class="card">
+                    <h2>Send events</h2>
+                    <div class="field">
+                        <label for="event-type">event stream type</label>
+                        <input id="event-type" value="application.demo.note" class="mono">
+                    </div>
+                    <div class="field">
+                        <label for="event-data">data (JSON object)</label>
+                        <textarea id="event-data" rows="2" class="mono">{ "note": "hello world" }</textarea>
+                    </div>
+                    <button id="send-event" data-testid="send-event">Send instant event</button>
+                    <div class="field" style="margin-top: 14px;">
+                        <label>duration event — press and hold</label>
+                        <button id="hold-button" data-testid="hold-button">◉ HOLD TO RECORD A TENTATIVE EVENT</button>
+                        <p class="hint-small">While held the event stays <b>tentative</b> — watch it grow on the timeline and snap solid when you release.</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- center column -->
+            <div>
+                <div class="card" id="timeline-card">
+                    <h2>Timeline <span style="text-transform:none; letter-spacing:0;">— every event type gets a lane; tentative events shimmer until they close</span></h2>
+                    <div id="timeline-wrap">
+                        <canvas id="timeline" data-testid="timeline"></canvas>
+                    </div>
+                    <div id="timeline-legend"></div>
+                    <!-- the selected event's details (click an event in the feed or on the timeline) -->
+                    <div id="event-details" class="hidden" data-testid="event-details">
+                        <div class="details-head">
+                            <span class="details-type mono" id="detail-type"></span>
+                            <span class="pill tentative-pill hidden" id="detail-tentative" title="the event is still open — its end and data keep updating until it closes">tentative</span>
+                            <button id="detail-close" title="clear the selection">✕</button>
+                        </div>
+                        <dl>
+                            <dt>entity</dt><dd id="detail-entity"></dd>
+                            <dt>id</dt><dd id="detail-id"></dd>
+                            <dt>start</dt><dd id="detail-start"></dd>
+                            <dt>end</dt><dd id="detail-end"></dd>
+                            <dt>duration</dt><dd id="detail-duration"></dd>
+                        </dl>
+                        <div class="details-label">data</div>
+                        <pre id="detail-data"></pre>
+                        <div id="detail-meta" class="hidden">
+                            <div class="details-label">meta</div>
+                            <pre id="detail-meta-json"></pre>
+                        </div>
+                    </div>
+                    <div id="replay-bar">
+                        <button id="replay-button" data-testid="replay-button">▶ Replay</button>
+                        <select id="replay-speed" style="width: auto;">
+                            <option value="1">1×</option>
+                            <option value="2">2×</option>
+                            <option value="4">4×</option>
+                            <option value="8">8×</option>
+                        </select>
+                        <div id="replay-progress"><div class="fill"></div></div>
+                        <span id="replay-status">replay uses the same subscription as the live tail</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- right column -->
+            <div>
+                <div class="card">
+                    <h2>Media ingest (WebRTC)</h2>
+                    <div id="media-buttons">
+                        <button id="media-camera" data-testid="media-camera">📷 Camera</button>
+                        <button id="media-mic" data-testid="media-mic">🎙 Microphone</button>
+                        <button id="media-screen" data-testid="media-screen">🖥 Screen</button>
+                    </div>
+                    <div id="recordings" data-testid="recordings"></div>
+                    <p class="hint-small">Media is negotiated over WebRTC and recorded server-side into streamable Matroska tracks — you can fetch a track while it is still growing.</p>
+                </div>
+                <div class="card">
+                    <h2>Processors</h2>
+                    <div id="processor-list" data-testid="processor-list"></div>
+                    <div id="processors-hint">
+                        Sessions are built from the spec this page sends at creation
+                        (<code>/application-spec.json</code>: the application.* event vocabulary
+                        plus the voice pipeline). AI processors need a <code>config.json</code>
+                        with an OpenAI-compatible endpoint on the server; without one they emit
+                        error events when audio flows. <b>Script processors</b> run sandboxed
+                        JavaScript right on the server — no external service needed:
+                    </div>
+                    <textarea id="script-editor" class="mono" spellcheck="false"></textarea>
+                    <div class="join-row" style="margin-top: 8px;">
+                        <button id="add-processor" class="primary" data-testid="add-processor" style="flex:none;">Add script processor</button>
+                        <input id="processor-name" value="exclaim0" class="mono" title="processor name">
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+</main>
+
+<footer>
+    SessionHistoryServer bundled demo · one file, zero external dependencies ·
+    protocol exercised by the functional tests in <code>tests/</code> · MIT
+</footer>
+
+<div id="toasts"></div>
+
+<script>
+"use strict";
+/* ═══════════════════════════════════════════════════════════════════════════
+   Demo application logic. Everything below speaks to the server through the
+   bundled session.js client library (window.SessionHistory) — this file is
+   also the reference for what the library can do.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+const $ = (id) => document.getElementById(id);
+
+// ── state ─────────────────────────────────────────────────────────────────
+let session = null;        // the SessionHistory instance
+let ingest = null;         // peer connection once connectIngest() resolved
+let ingestConnecting = null;
+let model = null;          // HistoryModel ("history")
+let eventStreams = {};     // streamType -> SCTPEventStream
+let eventsById = new Map();     // id -> event (everything the model told us)
+let laneByType = new Map();     // event type -> timeline lane index
+let holdEvent = null;      // the currently held duration event API
+let mediaActive = new Map();    // button id -> { stream, type, startedAt }
+let recordings = [];      // { type, resource, url, live }
+let replay = { playing: false, speed: 1, t0: 0, from: 0, to: 0 };
+let feedFilter = null;
+let selectedEventId = null;      // the event whose details are shown (click to select)
+let timelineHitRects = new Map(); // event id -> hit geometry in CSS pixels, rebuilt each frame
+let detailsSeq = 0;              // guards the async meta round-trip against stale renders
+let detailsMetaFor = null;       // the event id the cached meta JSON belongs to
+let detailsMetaJson = null;      // cached @Meta fields — immutable per event, fetched once
+
+// ── small utilities ───────────────────────────────────────────────────────
+function toast(message, isError = false) {
+    const el = document.createElement("div");
+    el.className = "toast" + (isError ? " error" : "");
+    el.textContent = message;
+    $("toasts").appendChild(el);
+    setTimeout(() => el.remove(), isError ? 8000 : 3500);
+}
+
+function entityColor(name) {
+    let hash = 0;
+    for (const c of String(name)) hash = (hash * 31 + c.charCodeAt(0)) >>> 0;
+    return `hsl(${hash % 360} 70% 62%)`;
+}
+
+function clock(ms) {
+    const d = new Date(ms);
+    return d.toTimeString().slice(0, 8);
+}
+
+function randomEntityName() {
+    const adjectives = ["curious", "amber", "quiet", "electric", "velvet", "northern", "clever", "cosmic", "gentle", "brisk"];
+    const animals = ["otter", "falcon", "lynx", "heron", "ibex", "marten", "puffin", "vole", "orca", "stoat"];
+    const pick = (arr) => arr[Math.floor(Math.random() * arr.length)];
+    return `${pick(adjectives)}-${pick(animals)}`;
+}
+
+// ── landing: the authorization gate ──────────────────────────────────────
+const urlSession = new URLSearchParams(location.search).get("session");
+// A ?session= URL only jumps into the session view once this identity is
+// authorized — a fresh guest sees the access box first, and the pending
+// join fires the moment "Get Access" succeeds.
+let urlSessionPending = null;
+// Each window/tab is its own entity (the demo syncs events between windows
+// attributed by entity), so the identity is per-tab: a reload keeps it, a
+// new tab gets a fresh name. A remembered entityKey for that name
+// (localStorage, also across reloads) authorizes instantly.
+const DEMO_ENTITY_STORAGE = "shsDemoEntity";
+try { $("entity-name").value = sessionStorage.getItem(DEMO_ENTITY_STORAGE) || randomEntityName(); }
+catch { $("entity-name").value = randomEntityName(); }
+
+function currentEntity() { return $("entity-name").value.trim() || randomEntityName(); }
+
+/**
+ * Shows the access box until this identity holds an entityKey, the session
+ * options afterwards. Returns whether the identity is authorized.
+ */
+function updateLanding() {
+    const authorized = !!SessionHistory.getEntityKeyFor(currentEntity());
+    $("access-card").classList.toggle("hidden", authorized);
+    $("session-card").classList.toggle("hidden", !authorized);
+    // an unauthorized visitor sees the box and nothing else on the page
+    $("landing-hero").classList.toggle("hidden", !authorized);
+    if (authorized) $("entity-known").textContent = currentEntity();
+    return authorized;
+}
+
+/** "Get Access": log in with the master password, then unlock the session options. */
+async function getAccess() {
+    const button = $("get-access");
+    if (button.disabled) return; // a login is already in flight
+    const entity = currentEntity();
+    const password = $("master-password").value;
+    $("access-error").textContent = "";
+    button.disabled = true;
+    try {
+        const hadKey = !!SessionHistory.getEntityKeyFor(entity);
+        if (!hadKey) {
+            if (!password) throw new Error("enter the master password");
+            await SessionHistory.login(entity, password);
+        }
+        $("entity-name").value = entity;
+        try { sessionStorage.setItem(DEMO_ENTITY_STORAGE, entity); } catch { }
+        $("master-password").value = ""; // the key is remembered; drop the secret
+        updateLanding();
+        if (!hadKey) toast(`Access granted — you are "${entity}"`);
+        if (urlSessionPending) { const id = urlSessionPending; urlSessionPending = null; joinSession(id); }
+    } catch (ex) {
+        $("access-error").textContent = `Could not get access: ${ex.message || ex}`;
+    } finally {
+        button.disabled = false;
+    }
+}
+
+$("get-access").onclick = getAccess;
+$("master-password").addEventListener("keydown", (e) => { if (e.key === "Enter") getAccess(); });
+$("entity-name").addEventListener("keydown", (e) => { if (e.key === "Enter") $("master-password").focus(); });
+
+async function joinSession(sessionId) {
+    const entity = currentEntity();
+    // The gate normally guarantees the key; if it vanished (it expired while
+    // the page sat open) the user goes back to the access box first.
+    if (!SessionHistory.getEntityKeyFor(entity)) {
+        urlSessionPending = sessionId || urlSessionPending;
+        updateLanding();
+        $("access-error").textContent = "authorization is needed first";
+        return;
+    }
+    try {
+        // This page is the reference application: it builds sessions from
+        // the application spec (the application.* event vocabulary plus the
+        // voice pipeline) served at /application-spec.json.
+        session = sessionId
+            ? await SessionHistory.join(sessionId)
+            : await SessionHistory.create(await fetch("application-spec.json").then((r) => r.json()));
+    } catch (ex) {
+        const message = String(ex?.message || ex);
+        toast(`Could not join: ${message}`, true);
+        // A key that exists but is refused by the server handshake is an
+        // expired key: the library only clears it on 401 HTTP replies, never
+        // on websocket handshakes, so without this the visitor is stranded
+        // on a session card with no visible way back to the inputs.
+        if (/entityKey may have expired/.test(message) && SessionHistory.getEntityKeyFor(entity)) {
+            SessionHistory.clearEntityKey();
+            urlSessionPending = sessionId || urlSessionPending; // re-fire once re-authorized
+            updateLanding();
+            $("access-error").textContent = "authorization expired — get access again";
+        } else if (!SessionHistory.getEntityKeyFor(entity)) { // an expired key is cleared by the library
+            updateLanding();
+            $("access-error").textContent = "authorization expired — get access again";
+        }
+        return;
+    }
+    urlSessionPending = null; // joined — nothing pending anymore
+    history.replaceState(null, "", `?session=${session.id}`);
+    $("landing").classList.add("hidden");
+    $("app").classList.remove("hidden");
+    $("entity-name-header").textContent = entity;
+    $("entity-name-header").style.color = entityColor(entity);
+    $("session-id-short").textContent = session.id.slice(0, 8) + "…";
+    $("session-pill").onclick = async () => {
+        try { await navigator.clipboard.writeText(session.id); toast("session id copied"); } catch { toast(session.id); }
+    };
+    setupIngest().catch((ex) => toast(`Ingest connection failed: ${ex.message || ex} — events over the data channel are unavailable`, true));
+    await connectAndRenderModel();
+    renderProcessors();
+    const owner = session.schema?.owner === entity;
+    if (owner) { $("start-session").classList.remove("hidden"); }
+}
+
+$("create-session").onclick = () => joinSession(null);
+$("join-button").onclick = () => {
+    const id = $("join-session").value.trim();
+    if (!id) return toast("paste a session id first", true);
+    joinSession(id);
+};
+$("join-session").addEventListener("keydown", (e) => { if (e.key === "Enter") $("join-button").click(); });
+
+// ── ingest (the WebRTC side: events over data channels + media) ──────────
+async function setupIngest() {
+    if (ingestConnecting) return ingestConnecting;
+    ingestConnecting = session.connectIngest();
+    ingest = await ingestConnecting;
+    return ingest;
+}
+
+async function eventStreamFor(type) {
+    await setupIngest();
+    if (!eventStreams[type]) eventStreams[type] = await session.ingest.startEventStream(type);
+    return eventStreams[type];
+}
+
+// ── model: the live + replayed event view ─────────────────────────────────
+async function connectAndRenderModel() {
+    model = await session.connectModel("history");
+    model.addEventListener("eventAdded", (event) => onEvent(event, false));
+    model.addEventListener("eventUpdated", (event) => onEvent(event, true));
+    $("feed-filter").oninput = () => {
+        const value = $("feed-filter").value.trim();
+        try { feedFilter = value ? new RegExp(value) : null; $("feed-filter").style.borderColor = ""; }
+        catch { $("feed-filter").style.borderColor = "var(--danger)"; }
+        renderFeed();
+    };
+}
+
+function matchesFeedFilter(type) {
+    return !feedFilter || feedFilter.test(type);
+}
+
+function onEvent(event, isUpdate) {
+    eventsById.set(event.id, event);
+    if (!laneByType.has(event.type)) laneByType.set(event.type, laneByType.size);
+    if (matchesFeedFilter(event.type)) renderFeedRow(event, isUpdate);
+    if (event.id === selectedEventId) renderEventDetails(); // the selected event may have grown/closed
+    if (event.type.startsWith("user.demo.")) learnRecording(event);
+}
+
+// ── feed ──────────────────────────────────────────────────────────────────
+function renderFeedRow(event, isUpdate) {
+    const feed = $("feed");
+    let row = feed.querySelector(`[data-event-id="${event.id}"]`);
+    if (!row) {
+        row = document.createElement("div");
+        row.className = "row";
+        row.dataset.eventId = event.id;
+        feed.prepend(row);
+        for (const empty of feed.querySelectorAll(".empty")) empty.remove();
+        while (feed.children.length > 250) feed.lastChild.remove();
+    }
+    row.classList.toggle("tentative", !!event.tentative);
+    row.classList.toggle("selected", event.id === selectedEventId);
+    row.title = "click to inspect this event";
+    row.onclick = () => selectEvent(event.id);
+    const who = event.entity || "server";
+    row.style.setProperty("--who-color", entityColor(who));
+    row.innerHTML = "";
+    row.append(
+        Object.assign(document.createElement("span"), { className: "t", textContent: clock(event.start) }),
+        Object.assign(document.createElement("span"), { className: "who", textContent: who, style: `color:${entityColor(who)}` }),
+        Object.assign(document.createElement("span"), { className: "what", textContent: event.type }),
+        Object.assign(document.createElement("span"), {
+            className: "data",
+            textContent: (event.tentative ? "◌ " : "") + JSON.stringify(event.data ?? {}),
+            title: JSON.stringify(event, null, 2),
+        }),
+    );
+    updateFeedCount();
+}
+
+function renderFeed() {
+    const feed = $("feed");
+    feed.innerHTML = "";
+    const sorted = [...eventsById.values()]
+        .filter((event) => matchesFeedFilter(event.type))
+        .sort((a, b) => b.start - a.start)
+        .slice(0, 250);
+    if (sorted.length === 0) {
+        feed.innerHTML = `<div class="empty">no events${feedFilter ? " matching the filter" : ""} yet</div>`;
+    }
+    for (const event of sorted) renderFeedRow(event, true);
+    updateFeedCount();
+}
+
+function updateFeedCount() {
+    const types = new Set([...eventsById.values()].map((e) => e.type)).size;
+    $("feed-count").textContent = `${eventsById.size} events · ${types} types`;
+}
+
+// ── sending events ───────────────────────────────────────────────────────
+$("send-event").onclick = async () => {
+    try {
+        const type = $("event-type").value.trim() || "application.demo.note";
+        const data = JSON.parse($("event-data").value || "{}");
+        if (typeof data !== "object" || Array.isArray(data)) throw new Error("data must be a JSON object");
+        (await eventStreamFor(type)).createInstantEvent(data);
+    } catch (ex) {
+        toast(`Could not send: ${ex.message || ex}`, true);
+    }
+};
+
+function holdStart() {
+    if (holdEvent) return;
+    $("hold-button").classList.add("held");
+    const type = $("event-type").value.trim() || "application.demo.note";
+    const startedAt = Date.now();
+    let released = false;
+    eventStreamFor(type).then((stream) => {
+        holdEvent = stream.createDurationEvent({ level: 0 });
+        if (released) { holdEvent.stop(); return; } // tap ended before the data channel was ready
+        holdEvent.timer = setInterval(() => {
+            if (!holdEvent) return;
+            const seconds = (Date.now() - startedAt) / 1000;
+            holdEvent.update({ level: Math.round(50 + 50 * Math.sin(seconds * 2 * Math.PI)) });
+        }, 200);
+    }).catch((ex) => toast(`Ingest not available: ${ex.message || ex}`, true));
+    holdEnd.released = () => { released = true; };
+}
+
+function holdEnd() {
+    $("hold-button").classList.remove("held");
+    holdEnd.released?.();
+    if (holdEvent?.timer) clearInterval(holdEvent.timer);
+    if (holdEvent) { try { holdEvent.stop(); } finally { holdEvent = null; } }
+}
+
+$("hold-button").addEventListener("pointerdown", (e) => { e.preventDefault(); holdStart(); });
+addEventListener("pointerup", holdEnd);
+$("hold-button").addEventListener("pointerleave", holdEnd);
+
+// ── timeline ──────────────────────────────────────────────────────────────
+const canvas = $("timeline");
+const ctx = canvas.getContext("2d");
+
+function timelineBounds() {
+    const now = replay.playing ? replay.playhead : Date.now();
+    const from = now - 60000, to = now + 3000;
+    return { from, to, now };
+}
+
+function drawTimeline() {
+    const dpr = window.devicePixelRatio || 1;
+    const width = canvas.clientWidth, height = canvas.clientHeight;
+    if (canvas.width !== width * dpr) { canvas.width = width * dpr; canvas.height = height * dpr; }
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.clearRect(0, 0, width, height);
+
+    const { from, to, now } = timelineBounds();
+    const x = (t) => ((t - from) / (to - from)) * width;
+    const maxLanes = 8;
+    const laneHeight = (height - 18) / Math.max(laneByType.size, 1);
+
+    // time grid
+    ctx.font = "10px ui-monospace, monospace";
+    ctx.fillStyle = "#566374";
+    ctx.strokeStyle = "#1a222d";
+    ctx.textAlign = "center";
+    for (let t = Math.ceil(from / 10000) * 10000; t < to; t += 10000) {
+        ctx.beginPath(); ctx.moveTo(x(t), 0); ctx.lineTo(x(t), height - 14); ctx.stroke();
+        ctx.fillText(clock(t).slice(3), x(t), height - 3);
+    }
+
+    // lanes + events (each drawn event also records its hit geometry, in
+    // CSS pixels, for the click/hover testing below)
+    const hits = new Map();
+    for (const [type, lane] of laneByType) {
+        if (lane >= maxLanes) continue;
+        const y = 8 + lane * laneHeight;
+        ctx.fillStyle = "#3c4a5c";
+        ctx.textAlign = "left";
+        ctx.font = "9.5px ui-monospace, monospace";
+        ctx.fillText(type.length > 34 ? type.slice(0, 33) + "…" : type, 6, y + laneHeight / 2 + 3);
+
+        for (const event of eventsById.values()) {
+            if (event.type !== type) continue;
+            const passed = replay.playing ? event.start <= replay.playhead : true;
+            const upcoming = replay.playing ? event.start > replay.playhead : false;
+            const color = entityColor(event.entity || "server");
+            const ex = x(event.start);
+            if (ex < -50 || ex > width + 50) continue;
+            const selected = event.id === selectedEventId;
+            if (event.end != null && event.end > event.start) {
+                const w = Math.max(3, x(Math.min(event.end, replay.playing ? replay.playhead : to)) - ex);
+                const h = Math.max(3, laneHeight - 10);
+                ctx.globalAlpha = upcoming ? 0.15 : (event.tentative ? 0.45 + 0.2 * Math.sin(Date.now() / 180) : 0.95);
+                ctx.fillStyle = color;
+                ctx.beginPath();
+                ctx.roundRect(ex, y, w, h, 2);
+                ctx.fill();
+                hits.set(event.id, { kind: "rect", x: ex, y, w, h });
+                if (selected) {
+                    ctx.globalAlpha = 1;
+                    ctx.strokeStyle = "#f2f6fb";
+                    ctx.lineWidth = 1.5;
+                    ctx.stroke();
+                    ctx.lineWidth = 1;
+                }
+            } else if (event.end == null || event.end === event.start) {
+                const cy = y + laneHeight / 2;
+                ctx.globalAlpha = upcoming ? 0.15 : (event.tentative ? 0.5 + 0.3 * Math.sin(Date.now() / 160) : 0.95);
+                ctx.fillStyle = color;
+                ctx.beginPath();
+                ctx.arc(ex, cy, 3.5, 0, Math.PI * 2);
+                ctx.fill();
+                hits.set(event.id, { kind: "circle", cx: ex, cy, r: 4 });
+                if (selected) {
+                    ctx.globalAlpha = 1;
+                    ctx.strokeStyle = "#f2f6fb";
+                    ctx.lineWidth = 1.5;
+                    ctx.beginPath();
+                    ctx.arc(ex, cy, 6.5, 0, Math.PI * 2);
+                    ctx.stroke();
+                    ctx.lineWidth = 1;
+                }
+            }
+            ctx.globalAlpha = 1;
+        }
+    }
+    timelineHitRects = hits;
+
+    // the "now" line (live) or playhead (replay)
+    ctx.strokeStyle = replay.playing ? "#a78bfa" : "#2dd4bf";
+    ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.moveTo(x(now), 0); ctx.lineTo(x(now), height - 14); ctx.stroke();
+    ctx.lineWidth = 1;
+
+    requestAnimationFrame(drawTimeline);
+}
+requestAnimationFrame(drawTimeline);
+
+// legend
+$("timeline-legend").innerHTML = `
+    <span><span class="swatch" style="background:var(--accent)"></span>instant event</span>
+    <span><span class="swatch tentative-swatch"></span>tentative (still updatable)</span>
+    <span><span class="swatch" style="background:var(--accent-2)"></span>playhead / now</span>
+    <span>colors = entities</span>
+    <span>click an event (here or in the feed) to inspect it</span>`;
+
+// ── event selection: click an event in the feed or on the timeline ────────
+function selectEvent(id) {
+    selectedEventId = id && eventsById.has(id) ? id : null;
+    for (const row of $("feed").querySelectorAll(".row")) {
+        row.classList.toggle("selected", row.dataset.eventId === selectedEventId);
+    }
+    renderEventDetails();
+}
+
+function renderEventDetails() {
+    const panel = $("event-details");
+    const event = selectedEventId ? eventsById.get(selectedEventId) : null;
+    if (!event) { panel.classList.add("hidden"); return; }
+    panel.classList.remove("hidden");
+    const who = event.entity || "server";
+    $("detail-type").textContent = event.type;
+    $("detail-type").style.color = entityColor(who);
+    $("detail-tentative").classList.toggle("hidden", !event.tentative);
+    $("detail-entity").textContent = who;
+    $("detail-id").textContent = event.id;
+    $("detail-start").textContent = `${clock(event.start)}  ·  ${new Date(event.start).toISOString()}`;
+    const end = event.end != null && event.end > event.start ? event.end : null;
+    $("detail-end").textContent = end ? `${clock(end)}  ·  ${new Date(end).toISOString()}` : "—";
+    $("detail-duration").textContent = end ? `${((end - event.start) / 1000).toFixed(2)} s` : "instant / still open";
+    $("detail-data").textContent = JSON.stringify(event.data ?? {}, null, 2);
+    // the meta fields (server creation time, processor lineage, the track
+    // resource of media events) ride as top-level @Meta-annotated fields on
+    // the event and need a server round-trip. They are immutable per event
+    // id, so they are fetched once and cached — a tentative event updating
+    // five times a second re-renders this panel without re-asking the
+    // server. The async reply is guarded against staleness on both the
+    // success and the rejection path.
+    const myId = event.id;
+    if (detailsMetaFor === myId && detailsMetaJson) {
+        $("detail-meta").classList.remove("hidden");
+        $("detail-meta-json").textContent = detailsMetaJson;
+    } else if (session) {
+        $("detail-meta").classList.add("hidden");
+        const seq = ++detailsSeq;
+        session.getEvent(myId, { includeMeta: true }).then((reply) => {
+            if (seq !== detailsSeq || selectedEventId !== myId) return; // user moved on
+            const ev = reply?.event;
+            const meta = {};
+            if (ev?.created != null) meta.created = new Date(ev.created).toISOString();
+            if (ev?.sourceEvents?.length) meta.sourceEvents = ev.sourceEvents;
+            if (ev?.processor != null) meta.processor = ev.processor;
+            if (ev?.track != null) meta.track = ev.track;
+            if (Object.keys(meta).length > 0) {
+                detailsMetaFor = myId;
+                detailsMetaJson = JSON.stringify(meta, null, 2);
+                $("detail-meta").classList.remove("hidden");
+                $("detail-meta-json").textContent = detailsMetaJson;
+            } else {
+                $("detail-meta").classList.add("hidden");
+            }
+        }).catch(() => {
+            if (seq === detailsSeq && selectedEventId === myId) {
+                $("detail-meta").classList.add("hidden"); // only the CURRENT selection's failure hides its meta
+            }
+        });
+    } else {
+        $("detail-meta").classList.add("hidden");
+    }
+}
+$("detail-close").onclick = () => selectEvent(null);
+
+// hit-testing on the canvas: the geometry recorded by the last drawn frame
+function eventAtCanvasPoint(px, py) {
+    let bestId = null, bestDist = Infinity;
+    for (const [id, r] of timelineHitRects) {
+        let dist = Infinity;
+        if (r.kind === "rect") {
+            if (px >= r.x - 3 && px <= r.x + r.w + 3 && py >= r.y - 3 && py <= r.y + r.h + 3) {
+                dist = Math.hypot(px - (r.x + r.w / 2), py - (r.y + r.h / 2));
+            }
+        } else {
+            const d = Math.hypot(px - r.cx, py - r.cy);
+            if (d <= Math.max(r.r + 4, 8)) dist = d;
+        }
+        if (dist < bestDist) { bestDist = dist; bestId = id; }
+    }
+    return bestId; // null when the click hit nothing
+}
+
+canvas.addEventListener("click", (e) => {
+    const rect = canvas.getBoundingClientRect();
+    const id = eventAtCanvasPoint(e.clientX - rect.left, e.clientY - rect.top);
+    selectEvent(id); // clicking empty space clears the selection
+});
+canvas.addEventListener("mousemove", (e) => {
+    const rect = canvas.getBoundingClientRect();
+    canvas.style.cursor = eventAtCanvasPoint(e.clientX - rect.left, e.clientY - rect.top) ? "pointer" : "crosshair";
+});
+
+// ── replay (client-side playhead over the same model) ─────────────────────
+function startReplay() {
+    // debug log events are stamped start:0 (epoch) — ignore anything older
+    // than six hours so the playhead measures this session, not 1970
+    const recent = [...eventsById.values()].filter((e) => e.start >= Date.now() - 6 * 3600 * 1000);
+    const sorted = recent.map((e) => e.start).sort((a, b) => a - b);
+    if (sorted.length === 0) return toast("nothing to replay yet — send an event first");
+    const lastEnd = Math.max(...recent.map((e) => e.end ?? e.start));
+    replay = { playing: true, speed: Number($("replay-speed").value), t0: performance.now(), from: sorted[0], to: Math.max(lastEnd, sorted.at(-1)), playhead: sorted[0] };
+    $("replay-button").textContent = "⏸ Stop replay";
+    $("replay-status").textContent = "replaying…";
+}
+
+function stopReplay() {
+    replay.playing = false;
+    $("replay-button").textContent = "▶ Replay";
+    $("replay-progress").firstElementChild.style.width = "0%";
+    $("replay-status").textContent = "replay uses the same subscription as the live tail";
+}
+
+function replayTick() {
+    if (!replay.playing) return;
+    replay.playhead = replay.from + (performance.now() - replay.t0) * replay.speed;
+    const progress = Math.min(1, (replay.playhead - replay.from) / Math.max(1, replay.to - replay.from));
+    $("replay-progress").firstElementChild.style.width = `${(progress * 100).toFixed(1)}%`;
+    $("replay-status").textContent = `${clock(replay.playhead)} / ${clock(replay.to)} at ${replay.speed}×`;
+    if (replay.playhead >= replay.to) { stopReplay(); toast("replay finished — the live tail continues from the same subscription"); }
+    else setTimeout(replayTick, 100);
+}
+
+$("replay-button").onclick = () => (replay.playing ? stopReplay() : startReplay() || replayTick());
+$("replay-speed").onchange = () => { if (replay.playing) { const elapsed = replay.playhead - replay.from; replay.speed = Number($("replay-speed").value); replay.t0 = performance.now() - elapsed / replay.speed; } };
+
+// ── media ingest ─────────────────────────────────────────────────────────
+const mediaButtons = [
+    { id: "media-camera", label: "camera", type: "user.demo.cam", constraints: { video: true, audio: true } },
+    { id: "media-mic", label: "microphone", type: "user.demo.voice", constraints: { audio: true } },
+    { id: "media-screen", label: "screen", type: "user.demo.screen", constraints: { video: true, audio: true }, display: true },
+];
+
+for (const button of mediaButtons) {
+    $(button.id).onclick = async () => {
+        if (mediaActive.has(button.id)) return;
+        try {
+            const stream = button.display
+                ? await navigator.mediaDevices.getDisplayMedia(button.constraints)
+                : await navigator.mediaDevices.getUserMedia(button.constraints);
+            mediaActive.set(button.id, { stream, type: button.type, startedAt: Date.now() });
+            $(button.id).classList.add("active");
+            await setupIngest();
+            await session.ingest.startMediaStream(button.type, stream);
+            toast(`${button.label} ingest started — the track events appear in the feed`);
+        } catch (ex) {
+            mediaActive.delete(button.id);
+            $(button.id).classList.remove("active");
+            toast(`${button.label} failed: ${ex.message || ex}`, true);
+        }
+    };
+}
+
+// when a track-start event arrives, look up its recording file via getEvent
+async function learnRecording(event) {
+    if (!/^(user\.demo\.(cam|voice|screen)\.(video|audio))$/.test(event.type)) return;
+    if (recordings.some((r) => r.id === event.id)) return;
+    try {
+        const reply = await session.sendWithReply({ cmd: "getEvent", id: event.id, options: { includeMeta: true } }, 10000);
+        const resource = reply?.event?.track?.resource;
+        if (!resource) return;
+        recordings.push({ id: event.id, type: event.type, resource, live: event.tentative !== false });
+        renderRecordings();
+    } catch { /* the track metadata is nice-to-have */ }
+}
+
+function renderRecordings() {
+    const box = $("recordings");
+    box.innerHTML = "";
+    for (const rec of recordings) {
+        const row = document.createElement("div");
+        row.className = "rec-row";
+        row.dataset.testid = "recording";
+        // media URLs carry the entityKey (media elements cannot send headers)
+        const url = SessionHistory.withEntityKey(
+            SessionHistory.serverBase + "session/" + session.id + "/media/" + rec.resource);
+        row.innerHTML = `<span class="dot ${rec.live ? "live" : ""}"></span>
+            <span class="name" title="${rec.resource}">${rec.type} · ${rec.resource.split(".").slice(-2).join(".")}</span>
+            <a href="${url}" target="_blank" rel="noopener">open stream</a>`;
+        box.appendChild(row);
+    }
+}
+
+// ── processors ────────────────────────────────────────────────────────────
+function renderProcessors() {
+    const list = $("processor-list");
+    list.innerHTML = "";
+    const processors = session.schema?.processors ?? {};
+    for (const [name, processor] of Object.entries(processors)) {
+        const row = document.createElement("div");
+        row.className = "proc-row";
+        row.dataset.testid = "processor-row";
+        row.innerHTML = `<span class="name" data-testid="processor-name">${name}</span>
+            <span class="type">${processor.type}</span>`;
+        const remove = document.createElement("button");
+        remove.textContent = "remove";
+        remove.onclick = async () => {
+            try {
+                await session.removeProcessor(name);
+                toast(`removed processor ${name}`);
+            } catch (ex) { toast(`remove failed: ${ex.message || ex}`, true); }
+        };
+        row.appendChild(remove);
+        list.appendChild(row);
+    }
+    const aiLeft = ["voicedetect0", "transcription0"].filter((n) => n in processors);
+    if (aiLeft.length && !$("remove-ai")) {
+        const note = document.createElement("button");
+        note.id = "remove-ai";
+        note.textContent = "Remove AI processors (no config.json here)";
+        note.style.marginTop = "8px";
+        note.onclick = async () => {
+            for (const name of aiLeft) {
+                if (!(name in (session.schema?.processors ?? {}))) continue;
+                try { await session.removeProcessor(name); } catch (ex) { toast(`${name}: ${ex.message || ex}`, true); }
+            }
+            toast("AI processors removed");
+        };
+        $("processors-hint").appendChild(note);
+    }
+}
+
+// The default sandboxed script: react to demo notes with a derived event.
+$("script-editor").value = `// Runs sandboxed on the server (GraalVM, statement-limited).
+// stund.startEventStream(type) must match an output declared below.
+let out = null;
+function init() {
+    out = stund.startEventStream("application.demo.exclaim");
+}
+function onEventAdded(ev) {
+    if (ev.type === "application.demo.note" && ev.data && ev.data.note) {
+        const text = String(ev.data.note);
+        out.createInstantEvent({ shout: text.toUpperCase(), words: text.split(/\\s+/).length }, ev.start);
+    }
+}
+function onEventUpdated(ev) {}`;
+
+$("add-processor").onclick = async () => {
+    const name = $("processor-name").value.trim() || "script0";
+    try {
+        await session.addProcessor(name, "ScriptProcessor", {
+            language: "js",
+            script: $("script-editor").value,
+            inputs: { "application\\.demo\\.note": {} },
+            outputs: { "application.demo.exclaim": { schemaId: "stund://demoExclaim.json", internal: true } },
+            schemas: {
+                "stund://demoExclaim.json": {
+                    type: "object",
+                    properties: { shout: { type: "string" }, words: { type: "integer" } },
+                    required: ["shout", "words"], additionalProperties: false,
+                },
+            },
+            emitExceptionEvents: true,
+            // log events carry start:0 (the sandbox logs at "epoch"), which
+            // would otherwise stretch the replay window back to 1970. Note:
+            // today's server honors this flag only for the schema declaration,
+            // not for emission (Processor.log() publishes unconditionally) —
+            // so the engine boot warning still shows in the feed at 00:00:00,
+            // and startReplay() filters it by age instead.
+            emitLogEvents: false,
+        });
+        toast(`script processor "${name}" added — send a note and watch the derived events`);
+        renderProcessors();
+    } catch (ex) {
+        toast(`addProcessor failed: ${ex.message || ex}`, true);
+    }
+};
+
+// schema changes re-render the processor list (the library stores the
+// new schema but exposes no hook for it — poll lightly)
+setInterval(() => { if (session?.schema) renderProcessors(); }, 5000);
+
+// ── session lifecycle (owner) ─────────────────────────────────────────────
+$("start-session").onclick = async () => {
+    try {
+        await session.start();
+        setRecState("live", "recording (started)");
+        $("start-session").classList.add("hidden");
+        $("stop-session").classList.remove("hidden");
+    } catch (ex) { toast(`start failed: ${ex.message || ex}`, true); }
+};
+$("stop-session").onclick = async () => {
+    try {
+        await session.stop();
+        setRecState("idle", "ended");
+        $("stop-session").classList.add("hidden");
+    } catch (ex) { toast(`stop failed: ${ex.message || ex}`, true); }
+};
+
+function setRecState(state, text) {
+    const dot = $("rec-pill").querySelector(".dot");
+    dot.className = `dot ${state === "live" ? "live" : state === "rec" ? "rec" : ""}`;
+    $("rec-state-text").textContent = text;
+}
+
+// a raw extra socket is used for nothing in this demo — but the ingest
+// connection itself flips the pill while media flows:
+setInterval(() => {
+    if (!session) return;
+    if (mediaActive.size > 0) setRecState("rec", `ingesting ${mediaActive.size} media stream${mediaActive.size > 1 ? "s" : ""}`);
+    else if ($("rec-state-text").textContent.startsWith("ingesting")) setRecState("idle", "idle");
+}, 1000);
+
+// ── boot: the authorization gate decides what a visitor sees ─────────────
+// An authorized identity (per-tab name with a remembered entityKey) goes
+// straight to the session options — and a ?session= URL jumps into that
+// session immediately. A fresh visitor sees only the access box; the URL
+// join stays pending until "Get Access" succeeds.
+if (updateLanding() && urlSession) {
+    urlSessionPending = urlSession;
+    joinSession(urlSession);
+} else if (urlSession) {
+    urlSessionPending = urlSession;
+}
+
+// A small debug/test affordance: the functional tests (tests/9-demo.mjs)
+// close the command websocket through it after each case, and the timeline
+// hit geometry is exposed for the click tests.
+window.__sh = {
+    get session() { return session; },
+    eventsById,
+    selectEvent,
+    get timelineHitRects() { return timelineHitRects; },
+};
+</script>
+</body>
+</html>

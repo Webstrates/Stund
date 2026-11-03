@@ -1,0 +1,16 @@
+{
+  "name": "sessionhistory-tests",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Functional tests for SessionHistoryServer: raw websocket protocol, model subscriptions, WebRTC ingest with a real headless browser, processors, replay, the bundled client library and the demo page.",
+  "scripts": {
+    "test": "mocha",
+    "test:demo": "mocha --no-config --timeout 240000 --exit ./9-demo.mjs"
+  },
+  "dependencies": {
+    "mocha": "^11.1.0",
+    "puppeteer-core": "^24.0.0",
+    "ws": "^8.18.0"
+  }
+}

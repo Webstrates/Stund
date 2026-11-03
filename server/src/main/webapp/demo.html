@@ -1,0 +1,339 @@
+<!DOCTYPE html>
+<!--
+  SessionHistory Demo
+  Webstrates-based demo page exercising the client library: starts screen,
+  camera and voice ingest streams and visualizes the live event model on a
+  vis.js timeline.
+
+  Copyright (c) 2026 Janus Kristensen - CAVI, Center for Advanced
+  Visualization and Interaction - Aarhus University
+  SPDX-License-Identifier: MIT
+-->
+<html>
+<head>
+    <title>SessionHistory Demo</title>
+<!--
+  All remote code this page loads is pinned, and the static tags carry
+  SRI hashes: the Webstrates/WPM repository files and WPMv2.js below are
+  frozen at upstream commit SHAs (master as of 2026-10-20) and
+  vis-timeline at 8.5.4. Bump a pin only as a deliberate, reviewed
+  change — a moving @master/@latest reference executes whatever those
+  repositories contain today, on every deployment that opens this page.
+-->
+<script type="text/json+bootconfig">{
+    "creator": "WPMPackageManager",
+    "created": 1650368097912,
+    "require": [
+        {
+            "repositories": {
+                "codestrates-repos": "https://raw.githubusercontent.com/Webstrates/Codestrates-v2/6b8ad76262f51d47ee925565d36414d078ac1019/codestrates.html",
+                "webstrate-components-repos": "https://raw.githubusercontent.com/Webstrates/WebstrateComponents/f37bad15d5d2b66028d0a300f3958b0c8fd29f61/components.html",
+                "cauldron-repos": "https://raw.githubusercontent.com/Webstrates/Cauldron/b975da18185831b9b86e0c7143989a3807c1467d/cauldron.html",
+                "wpm_js_libs": "https://raw.githubusercontent.com/Webstrates/WebstrateLibraryRepository/ae4c7f7ab47dc87ad1268b15fb49ec5b44535236/libraries.html",
+                "varv-repos": "https://raw.githubusercontent.com/Webstrates/Varv/1a2b3f5c33acb2c4618418aa012573e6008c6d15/varv.html",
+                "wpm-repos": "https://raw.githubusercontent.com/Webstrates/WPM/de2d17ad96bd861b22a32d7739e53b549031481e/build.html"
+            },
+            "dependencies": [
+                {
+                    "package": "CauldronButtonLauncher",
+                    "repository": "cauldron-repos"
+                },
+                {
+                    "package": "fragment_js",
+                    "repository": "codestrates-repos"
+                },
+                {
+                    "package": "fragment_html",
+                    "repository": "codestrates-repos"
+                },
+                {
+                    "package": "fragment_json",
+                    "repository": "codestrates-repos"
+                },
+                {
+                    "package": "fragment_wpm-descriptor",
+                    "repository": "codestrates-repos"
+                },
+                {
+                    "package": "fragment_css",
+                    "repository": "codestrates-repos"
+                },
+                {
+                    "package": "fragment_scss",
+                    "repository": "codestrates-repos"
+                },
+                {
+                    "package": "CauldronAutoLauncher",
+                    "repository": "cauldron-repos"
+                },
+                {
+                    "package": "CauldronURLLauncher",
+                    "repository": "cauldron-repos"
+                }
+            ],
+            "options": {}
+        }
+    ],
+    "updated": 1718020580511
+}</script>
+</head>
+<body>
+<wpm-package id="WPM-dev" data-repository="https://cdn.jsdelivr.net/gh/Webstrates/WPM@de2d17ad96bd861b22a32d7739e53b549031481e/build.html">
+    <script id="descriptor-script" type="descriptor">
+    {
+        "dependencies": [
+        ],
+        "forceEmbedding": true
+    }
+
+    </script>
+    <script id="WPMv2-script" src="https://cdn.jsdelivr.net/gh/Webstrates/WPM@de2d17ad96bd861b22a32d7739e53b549031481e/WPMv2.js"
+        integrity="sha384-8hO6wRrvnhoxx3IyuvORGgcqRgiAvlUF8VMJ1vPmqAZg8uLFyBLbMHA1CU5jRK71" crossorigin="anonymous" type="text/javascript"></script>
+</wpm-package>
+<script src="session.js"></script>
+<script src="https://unpkg.com/vis-timeline@8.5.4/dist/vis-timeline-graph2d.min.js"
+    integrity="sha384-roRRaTh55pU1BrDLPz0PKHLWMXQHRwau67GoEm+hwKdNyCw754N4LKYEWdS13M2W" crossorigin="anonymous"></script>
+<link href="https://unpkg.com/vis-timeline@8.5.4/dist/vis-timeline-graph2d.min.css"
+    integrity="sha384-FLmNZV3FE/3JWFElznTQEVuku8vpVTPbr1yMxNAORG9tfGNOrE9kJOgPop6LTZUK" crossorigin="anonymous" rel="stylesheet" type="text/css" />
+
+
+<code-fragment data-type="text/html" auto="">
+    <h1>SessionHistory Demo</h1>
+
+    <button id="startScreen">Start ScreenShare</button>
+    <button id="stopScreen">Stop ScreenShare</button>
+    <br /><br />
+    <button id="startCam">Start Camera</button>
+    <button id="stopCam">Stop Camera</button>
+    <br /><br />
+    <button id="startVoice">Start Voice</button>
+    <button id="stopVoice">Stop Voice</button>
+    <br />
+    <div id="timeline-container"></div>
+
+    <style>
+        #timeline-container {
+            width: 100%;
+            height: 300px;
+            border: 1px solid lightgray;
+        }
+        .vis-timeline {
+            overflow: visible;
+        }
+
+        #timeline-container .tentative {
+            opacity: 0.5;
+        }
+    </style>
+</code-fragment>
+
+
+
+<code-fragment data-type="text/javascript" auto="">
+try {
+    // The server demands an entityKey proving ownership of the entity id
+    // this demo joins as ("test-entity"). Log in first — skipped when a key is
+    // already remembered (e.g. from a previous run; it also survives page
+    // reloads). Cancelling the prompt leaves the join to fail with the
+    // server's rejection, logged below.
+    if (!SessionHistory.getEntityKeyFor("test-entity")) {
+        const masterPassword = prompt("SessionHistoryServer master password (from the server's config.json) to log in as 'test-entity'");
+        if (masterPassword) await SessionHistory.login("test-entity", masterPassword);
+    }
+
+    // TODO
+    let session = await SessionHistory.join("test");
+    console.log(session);
+    window.stundSession = session;
+    let con = await session.connectIngest();
+    window.model = await session.connectModel("history");
+    model.addEventListener("eventAdded", (e)=>console.log("Added",e));
+    model.addEventListener("eventUpdated", (e)=>console.log("Updated",e));
+    /*model.addEventListener("eventRemoved", (e)=>console.log("Removed",e));
+    model.addEventListener("modelChanged", (e)=>console.log("Changed Model",e));*/
+
+    let toast = await con.startEventStream("application.toastbread");
+    setInterval(()=>{
+        toast.createInstantEvent({done:true, t: Date.now()});
+    }, 30000);
+    let heavyMetal = await con.startEventStream("application.metal.heaviness");
+    let ev = heavyMetal.createDurationEvent({valueA: 1, valueB: 2, valueC: {nested1: true, nested2: true}});
+    setTimeout(()=>{
+        ev.update({valueB:3});
+        setTimeout(()=>{
+            ev.stop({valueC:{nested3:true}});
+        }, 1000);
+    }, 1000);
+
+    /*
+
+    let barking = await con.startEventStream("dog.bark");
+    let state = await con.startEventStream("dog.posture");
+    console.log(toast);
+    barking.createInstantEvent({dog: "poodle"});
+    barking.createInstantEvent({dog: "grand danois"});
+    barking.createInstantEvent({dog: "poodle"});
+
+
+    state.createStateEvent({position: "standing"});
+    setTimeout(()=>{
+        state.createStateEvent({position: "sitting"});
+        setTimeout(()=>{
+            state.createStateEvent({position: "lying"});
+        },100);
+    },100);
+
+    let ev = heavyMetal.createDurationEvent({valueA: 1, valueB: 2, valueC: {nested1: true, nested2: true}});
+    setTimeout(()=>{
+        ev.update({valueB:3});
+        setTimeout(()=>{
+            ev.stop({valueC:{nested3:true}});
+        }, 1000);
+    }, 1000);
+    let danglingEvent = heavyMetal.createDurationEvent({valueA: 1, valueB: 2, valueC: {nested1: true, nested2: true}});
+    danglingEvent = null;*/
+
+    document.querySelector("#startScreen").addEventListener("click", async ()=>{
+        let userMedia = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: true });
+        window.screenStream = await con.startMediaStream("user.screen", userMedia, {buffalo: true});
+    });
+
+    document.querySelector("#startCam").addEventListener("click", async ()=>{
+        let userMedia = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+        window.camStream = await con.startMediaStream("user.cam", userMedia);
+    });
+
+    document.querySelector("#startVoice").addEventListener("click", async ()=>{
+        let userMedia = await navigator.mediaDevices.getUserMedia({ video: false, audio: true });
+        window.userVoice = await con.startMediaStream("user.voice", userMedia);
+    });
+
+    document.querySelector("#stopScreen").addEventListener("click", async ()=>{
+        if (window.screenStream) await con.stopMediaStream(window.screenStream);
+    });
+
+    document.querySelector("#stopCam").addEventListener("click", async ()=>{
+        if (window.camStream) await con.stopMediaStream(window.camStream);
+    });
+
+    document.querySelector("#stopVoice").addEventListener("click", async ()=>{
+        if (window.userVoice) await con.stopMediaStream(window.userVoice);
+    });
+
+} catch (ex){
+    console.log(ex);
+}
+</code-fragment>
+
+<code-fragment data-type="text/javascript" auto="">
+// --- 1. Initialize DataSets and Timeline ---
+
+// DataSets for two-way data binding
+const items = new vis.DataSet();
+const groups = new vis.DataSet();
+// Internal set to quickly track which 'event.type' groups already exist
+const existingGroupTypes = new Set();
+
+// Configuration options
+const options = {
+    // Show event content on hover (Full event content is set in the data conversion function)
+    tooltip: {
+        followMouse: true, // Tooltip follows the mouse cursor
+        overflowMethod: 'cap' // Keep the tooltip within the timeline boundaries
+    },
+    // Set a default start/end range (optional, can be adjusted)
+    start: Date.now() - (1000 * 60 * 2),
+    end: Date.now() + (1000 * 60 * 1)
+};
+
+// DOM element where the Timeline will be attached
+const container = document.getElementById('timeline-container');
+
+// Create the Timeline
+const timeline = new vis.Timeline(container, items, groups, options);
+
+// --- 2. Helper Functions for Data Conversion and Group Management ---
+
+/**
+ * Converts a raw event from the model into a vis.js Item object.
+ * @param {object} event - The raw event object (must have id, type, and start).
+ * @returns {object} A vis.js compatible item.
+ */
+function eventToTimelineItem(event) {
+    // start is guaranteed (Java's System.currentTimeMillis())
+    const item = {
+        id: event.id,
+        group: event.type, // Group by event.type (the "track")
+        start: new Date(event.start),
+        content: `Event: ${event.type}`,
+        // 3) Shows the full content of the events when hovered
+        title: JSON.stringify(event, null, 2).replace(/\n/g, "&lt;br/>"), // Full JSON content in the tooltip
+        className: event.tentative ? 'tentative' : ''
+    };
+
+    // 'end' is not guaranteed, so only add it if present and greater than start
+    if (event.end && event.end > event.start) {
+        item.end = new Date(event.end);
+        item.type = 'range'; // Display as a range/box
+    } else {
+        item.type = 'point'; // Display as a point
+    }
+
+    return item;
+}
+
+/**
+ * Adds a new vis.js Group based on the event's type if it doesn't exist.
+ * @param {string} eventType - The type of the event, used as the group ID and content.
+ */
+function ensureGroupExists(eventType) {
+    if (!existingGroupTypes.has(eventType)) {
+        groups.add({
+            id: eventType,
+            content: eventType // Label for the track
+        });
+        existingGroupTypes.add(eventType);
+    }
+}
+
+// --- 3. Model Event Listeners for Dynamic Updates ---
+
+// The 'model' is assumed to be an existing object that emits events.
+// Guarded: when the session join above failed, window.model is never
+// assigned and the timeline simply stays empty instead of throwing.
+window.model?.addEventListener("eventAdded", (event) => {
+    // 2) Add "tracks" based on event.type when it spots new ones
+    ensureGroupExists(event.type);
+
+    // Add the new item to the vis.DataSet (Timeline updates automatically)
+    const item = eventToTimelineItem(event);
+    items.add(item);
+});
+
+window.model?.addEventListener("eventUpdated", (event) => {
+    // Group must exist before item is added/updated
+    ensureGroupExists(event.type);
+
+    // Update the existing item in the vis.DataSet
+    const item = eventToTimelineItem(event);
+    items.update(item);
+});
+
+window.model?.addEventListener("eventRemoved", (event) => {
+    // The event payload might just contain {id: '...'} or the full event.
+    // The only thing needed for removal is the ID
+    items.remove(event.id);
+
+    // NOTE: Group removal logic is complex (only remove group if it has no items)
+    // and often omitted, but it could be implemented here.
+});
+</code-fragment>
+
+
+<code-fragment data-type="text/css" auto="" transient-fragment-uuid="fragment-5a506b2de26628cebabd">video {
+    background: grey;
+    max-width: 100%;
+}</code-fragment>
+
+</body>
+</html>
