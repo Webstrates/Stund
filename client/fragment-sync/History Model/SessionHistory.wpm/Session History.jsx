@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 
 import { useDOMState, useTransientDOMState } from '#CoreHelpers .dom-store';
 import {
@@ -9,139 +9,171 @@ import {
 
 
 
-if (!window.sessionHistory) {
-    window.sessionHistory = {};
+// Connection and credentials are local to this browser, never synchronized.
+const runtime = window.sessionHistory || (window.sessionHistory = {});
+const notify = () => window.dispatchEvent(new Event('stund-history-local-change'));
+const reportError = (message) => {
+    runtime.error = message;
+    notify();
+};
+
+function clearConnection() {
+    runtime.generation = (runtime.generation || 0) + 1;
+    const session = runtime.session;
+    runtime.session = null;
+    runtime.model = null;
+    runtime.ingest = null;
+    runtime.modelPromise = null;
+    runtime.busy = false;
+    if (session) {
+        session.onDisconnect = null;
+        session.dispose();
+    }
+    notify();
 }
 
 export const useSession = () => {
-    const [session, setSession] = useState(window.sessionHistory.session || null);
+    const [, refresh] = useState(0);
     const [sessionId, setSessionId] = useDOMState('history-session-id', '');
-    const [sessionJoined, setSessionJoined] = useTransientDOMState('history-session-joined', false);
+    const [sessionJoinedFlag, setSessionJoined] = useTransientDOMState('history-session-joined', false);
     const [autoJoinEnabled, setAutoJoinEnabled] = useDOMState('history-session-auto-join', false);
     const [historyServerOverride, setHistoryServerOverride] = useDOMState('history-model-server', '');
-    const configuredHistoryServer = typeof historyServerOverride === 'string' && historyServerOverride.trim()
-        ? historyServerOverride.trim()
-        : DEFAULT_SESSION_HISTORY_SERVER;
-    let effectiveHistoryServer = configuredHistoryServer;
-
-    try {
-        effectiveHistoryServer = normalizeSessionHistoryServerUrl(configuredHistoryServer);
-    } catch (error) {
-        // Preserve an invalid shared value so create/join can report the validation error.
-    }
-    const autoJoinCheckedOnLoadRef = useRef(false);
+    const entityId = webstrate.user.userId;
+    const effectiveHistoryServer = normalizeSessionHistoryServerUrl(historyServerOverride || DEFAULT_SESSION_HISTORY_SERVER);
+    const context = JSON.stringify([effectiveHistoryServer, entityId]);
+    const tokenState = entityId
+        ? SessionHistory.getTokenState(entityId, effectiveHistoryServer)
+        : { status: 'missing', expires: null };
+    const hasAccessToken = tokenState.status === 'available';
+    const session = runtime.session || null;
+    const sessionJoined = !!session;
 
     useEffect(() => {
-        if (sessionJoined && !session) {
-            setSession(window.sessionHistory.session);
-        }
-    }, [sessionJoined]);
+        const update = () => refresh((value) => value + 1);
+        window.addEventListener('stund-history-local-change', update);
+        window.addEventListener('focus', update);
+        document.addEventListener('visibilitychange', update);
+        const timer = setInterval(update, 30000);
+        return () => {
+            window.removeEventListener('stund-history-local-change', update);
+            window.removeEventListener('focus', update);
+            document.removeEventListener('visibilitychange', update);
+            clearInterval(timer);
+        };
+    }, []);
 
-    const createSession = useCallback(async () => {
-        if (!webstrate.user.userId) {
-            alert('You must be logged in to create a session.');
-            return;
-        }
+    useEffect(() => {
+        if (!hasAccessToken || !tokenState.expires) return;
+        const timer = setTimeout(() => refresh((value) => value + 1), Math.min(2147483647, Math.max(0, tokenState.expires - Date.now())));
+        return () => clearTimeout(timer);
+    }, [hasAccessToken, tokenState.expires]);
 
-        if (sessionJoined) {
-            alert('You have already joined a session.');
-            return;
+    useEffect(() => {
+        if (runtime.context !== context) {
+            runtime.context = context;
+            clearConnection();
+            runtime.error = '';
+            setSessionJoined(false);
         }
+    }, [context]);
 
-        const confirmation = confirm('Creating a new session will overwrite any existing session for this meeting. Do you want to continue?');
-        if (!confirmation) {
-            return;
-        }
+    useEffect(() => {
+        if (sessionJoinedFlag !== sessionJoined) setSessionJoined(sessionJoined);
+    }, [sessionJoined, sessionJoinedFlag]);
 
+    const generateAccessToken = async (password) => {
+        if (runtime.busy || !entityId) return;
+        runtime.busy = true;
+        runtime.error = '';
+        const generation = runtime.generation;
+        notify();
         try {
-            const newSession = await SessionHistory.create(webstrate.user.userId, effectiveHistoryServer);
-            setSessionId(newSession.id);
-
-            window.sessionHistory.session = newSession;
-            setSession(newSession);
-            setSessionJoined(true);
+            await SessionHistory.generateAccessToken(entityId, password, effectiveHistoryServer);
         } catch (error) {
-            console.error('Failed to create session:', error);
-            alert(`Failed to create session: ${error?.message || error}`);
-        }
-    }, [effectiveHistoryServer, sessionJoined, setSessionId, setSessionJoined]);
-
-    const joinSession = useCallback(async () => {
-        if (!webstrate.user.userId) {
-            alert('You must be logged in to join a session.');
-            return;
-        }
-
-        if (!sessionId) {
-            alert('The meeting does not have a session ID.');
-            return;
-        }
-
-        if (sessionJoined) {
-            alert('You have already joined the session.');
-            return;
-        }
-
-        try {
-            const newSession = await SessionHistory.join(sessionId, webstrate.user.userId, effectiveHistoryServer);
-
-            window.sessionHistory.session = newSession;
-            setSession(newSession);
-            setSessionJoined(true);
-        } catch (error) {
-            console.error('Failed to join session:', error);
-            alert(`Failed to join session: ${error?.message || error}`);
-        }
-    }, [effectiveHistoryServer, sessionId, sessionJoined, setSessionJoined]);
-
-    const disconnectSession = useCallback(() => {
-        if (!sessionJoined) {
-            return;
-        }
-
-        const activeSession = session || window.sessionHistory.session;
-        if (activeSession && typeof activeSession.dispose === 'function') {
-            try {
-                activeSession.dispose();
-            } catch (error) {
-                console.warn('Failed to dispose session cleanly:', error);
+            if (runtime.generation === generation) runtime.error = error.message.startsWith('Access token generation') || error.message.startsWith('The server returned') ? error.message : 'Access token generation failed. Check the server connection.';
+        } finally {
+            if (runtime.generation === generation) {
+                runtime.busy = false;
+                notify();
             }
         }
+    };
 
-        window.sessionHistory.session = null;
-        window.sessionHistory.model = null;
-        window.sessionHistory.ingest = null;
-
-        setSession(null);
-        setSessionJoined(false);
-    }, [session, sessionJoined, setSessionJoined]);
+    const connect = async (create) => {
+        if (runtime.busy || runtime.session) return;
+        if (!SessionHistory.getCredentials(entityId, effectiveHistoryServer)) {
+            reportError('Access Token Required. Generate an access token first.');
+            return;
+        }
+        if (!create && !sessionId) return;
+        if (create && !confirm('Creating a new session will overwrite any existing session for this meeting. Do you want to continue?')) return;
+        runtime.busy = true;
+        runtime.error = '';
+        const generation = runtime.generation;
+        notify();
+        try {
+            const connected = create
+                ? await SessionHistory.create(entityId, effectiveHistoryServer)
+                : await SessionHistory.join(sessionId, entityId, effectiveHistoryServer);
+            if (runtime.generation !== generation || runtime.context !== context) {
+                connected.dispose();
+                return;
+            }
+            runtime.session = connected;
+            connected.onError = reportError;
+            connected.onDisconnect = (message) => {
+                if (runtime.session !== connected) return;
+                clearConnection();
+                setSessionJoined(false);
+                reportError(message);
+            };
+            if (create) setSessionId(connected.id);
+            setSessionJoined(true);
+        } catch (error) {
+            if (runtime.generation === generation) {
+                // Browser fetch errors may include keyed URLs; only expose our safe messages.
+                runtime.error = /^(History |Access Token Required|Session schema|Session creation|The server returned|Could not fetch|The history server)/.test(error.message)
+                    ? error.message : 'Could not connect to the history server. Check the connection or generate a new access token.';
+            }
+        } finally {
+            if (runtime.generation === generation) {
+                runtime.busy = false;
+                notify();
+            }
+        }
+    };
 
     useEffect(() => {
-        if (autoJoinCheckedOnLoadRef.current) {
-            return;
-        }
-        autoJoinCheckedOnLoadRef.current = true;
-
-        if (!autoJoinEnabled || !sessionId || sessionJoined) {
-            return;
-        }
-
-        joinSession();
+        if (runtime.autoJoinChecked) return;
+        runtime.autoJoinChecked = true;
+        if (autoJoinEnabled && sessionId && hasAccessToken && !runtime.session) connect(false);
     }, []);
 
     return {
-        session,
-        sessionId,
-        sessionJoined,
-        autoJoinEnabled,
-        historyServerOverride,
-        effectiveHistoryServer,
-        defaultHistoryServer: DEFAULT_SESSION_HISTORY_SERVER,
-        setAutoJoinEnabled,
-        setHistoryServerOverride,
-        createSession,
-        joinSession,
-        disconnectSession
+        session, sessionId, sessionJoined, autoJoinEnabled, historyServerOverride,
+        effectiveHistoryServer, defaultHistoryServer: DEFAULT_SESSION_HISTORY_SERVER,
+        setAutoJoinEnabled, setHistoryServerOverride,
+        tokenState, hasAccessToken, canGenerateAccessToken: !!entityId,
+        busy: !!runtime.busy, error: runtime.error || '',
+        generateAccessToken,
+        removeAccessToken: () => {
+            clearConnection();
+            SessionHistory.removeAccessToken(entityId, effectiveHistoryServer);
+            setSessionJoined(false);
+            runtime.error = '';
+            notify();
+        },
+        createSession: () => connect(true),
+        joinSession: () => connect(false),
+        clearSessionId: () => {
+            if (runtime.busy || runtime.session || !sessionId) return;
+            if (!confirm('Clear the session ID for everyone in this workspace?')) return;
+            setSessionId('');
+        },
+        disconnectSession: () => {
+            clearConnection();
+            setSessionJoined(false);
+        }
     };
 };
 
@@ -161,7 +193,7 @@ export const useSessionHelpers = () => {
         }
 
         const voiceDetectEvent = await session.getEvent(voiceDetectEventId, { includeMeta: true });
-        const mediaResourceId = voiceDetectEvent?.event?.track?.ressource;
+        const mediaResourceId = voiceDetectEvent?.event?.track?.resource ?? voiceDetectEvent?.event?.track?.ressource;
 
         if (!mediaResourceId) {
             throw new Error(`No media resource found for event ID ${voiceDetectEventId}`);
@@ -183,51 +215,47 @@ export const useSessionHelpers = () => {
 
 export const useSessionIngest = () => {
     const { session } = useSession();
-    const [ingest, setIngest] = useState(window.sessionHistory.ingest || null);
-
+    const [ingest, setIngest] = useState(null);
     useEffect(() => {
-        if (!session) {
-            setIngest(null);
-            return;
-        }
-
-        if (session && !ingest) {
-            session.connectIngest().then((newIngest) => {
-                window.sessionHistory.ingest = newIngest;
-                setIngest(newIngest);
-            });
-        }
+        let active = true;
+        setIngest(null);
+        if (!session) return;
+        session.connectIngest().then((connected) => {
+            if (!active || runtime.session !== session) return;
+            connected.onIngestError = () => reportError('History media recording failed. Disconnect and reconnect to retry.');
+            runtime.ingest = connected;
+            setIngest(connected);
+        }).catch(() => {
+            if (active && runtime.session === session) reportError('History ingest connection failed. Disconnect and reconnect to retry.');
+        });
+        return () => { active = false; };
     }, [session]);
-
-    return ingest;
+    return session && runtime.ingest === ingest ? ingest : null;
 };
 
 export const useSessionModel = () => {
     const { session } = useSession();
-    const [model, setModel] = useState(window.sessionHistory.model || null);
-
+    const [model, setModel] = useState(null);
     useEffect(() => {
-        if (!session) {
-            setModel(null);
-            return;
+        let active = true;
+        setModel(null);
+        if (!session) return;
+        if (!runtime.modelPromise) {
+            runtime.modelPromise = session.connectModel('history');
         }
-        if (model) return;
-
-        const runAsync = async () => {
-            if (window.sessionHistory.model) {
-                setModel(window.sessionHistory.model);
-                return;
+        runtime.modelPromise.then((connected) => {
+            if (!active || runtime.session !== session) return;
+            runtime.model = connected;
+            setModel(connected);
+        }).catch(() => {
+            if (active && runtime.session === session) {
+                runtime.modelPromise = null;
+                reportError('History model connection failed. Disconnect and reconnect to retry.');
             }
-
-            const newModel = await session.connectModel('history');
-            window.sessionHistory.model = newModel;
-            setModel(newModel);
-        };
-
-        runAsync();
+        });
+        return () => { active = false; };
     }, [session]);
-
-    return model;
+    return session && model?.session === session ? model : null;
 };
 
 /**

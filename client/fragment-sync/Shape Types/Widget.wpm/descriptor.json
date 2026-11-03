@@ -1,6 +1,8 @@
 {
     "description": "Widget shape for custom integrations",
-    "dependencies": [],
+    "dependencies": [
+        "#CanvasHelpers"
+    ],
     "assets": [],
     "version": "0.1.0"
 }

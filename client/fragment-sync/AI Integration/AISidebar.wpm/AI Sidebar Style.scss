@@ -1,3 +1,11 @@
+.ai-sidebar-resize-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 1000;
+    cursor: col-resize;
+    user-select: none;
+}
+
 .ai-sidebar {
     -webkit-backdrop-filter: blur(16px);
     backdrop-filter: blur(16px);
@@ -281,10 +289,10 @@
         background: transparent;
         z-index: 20;
         transition: background 0.2s ease;
+    }
 
-        &:hover {
-            background: rgba(99, 0, 238, 0.3);
-        }
+    &:not(.resizing) .ai-sidebar-resize-handle:hover {
+        background: rgba(99, 0, 238, 0.3);
     }
 
     &.minimized {
@@ -296,7 +304,10 @@
 
     &.resizing {
         user-select: none;
-        transition: none;
+
+        &:not(.minimized) {
+            transition: none;
+        }
 
         .ai-sidebar-resize-handle {
             background: rgba(99, 0, 238, 0.5);

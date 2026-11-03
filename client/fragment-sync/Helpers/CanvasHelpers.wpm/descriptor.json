@@ -1,6 +1,8 @@
 {
     "description": "Helper utilities for canvas and editor integration.",
-    "dependencies": [],
+    "dependencies": [
+        "#ImportMapping"
+    ],
     "assets": [],
     "version": "0.1.0"
 }

@@ -90,6 +90,7 @@ export function Main() {
     useEffect(() => {
         if (!editor || !ingest || !active || typeof subscribeEvent !== 'function' || typeof triggerEvent !== 'function') return;
 
+        let isCancelled = false;
         let storeListener = null;
         let sessionListener = null;
         let unsubscribeFullscreenEditing = null;
@@ -102,6 +103,7 @@ export function Main() {
             const shapeColorChangedStream = await ingest.startEventStream('application.interaction.shape.colorChanged');
             const shapeTextChangedStream = await ingest.startEventStream('application.interaction.shape.textChanged');
             const documentTextChangedStream = await ingest.startEventStream('application.interaction.document.textChanged');
+            if (isCancelled) return;
 
             // Initialize trackers with their respective streams and timeouts
             const moveTracker = new DurationChangeTracker(shapeMovedStream, { timeout: 1500 });
@@ -111,250 +113,43 @@ export function Main() {
             textTrackerRef.current = textTracker;
             documentTextTrackerRef.current = documentTextTracker;
 
-            let activeDocumentShapeId = null;
-            let activeDocumentFragmentId = null;
-            let activeDocumentEditSource = null;
-            let activeDocumentFragment = null;
-            let activeDocumentFragmentChangedHandler = null;
-            let activeDocumentText = '';
-            let activeDocumentName = '';
-            let fullscreenDocumentEditingState = { isEditing: false, shapeId: null, fragmentId: null };
-
-            const unbindDocumentFragmentChangeListener = () => {
-                if (!activeDocumentFragment || !activeDocumentFragmentChangedHandler) {
-                    return;
-                }
-
-                try {
-                    activeDocumentFragment.unRegisterOnFragmentChangedHandler(activeDocumentFragmentChangedHandler);
-                } catch (error) {
-                }
-
-                activeDocumentFragment = null;
-                activeDocumentFragmentChangedHandler = null;
-            };
-
-            const getDocumentNameFromFragment = (fragment) => {
-                return typeof fragment?.element?.getAttribute === 'function'
-                    ? (fragment.element.getAttribute('name') || '').trim()
-                    : '';
-            };
+            let activeDocumentTarget = null;
+            let fullscreenDocumentEditingState = { isEditing: false, shapeId: null };
 
             const stopCurrentDocumentEditTracking = (reason) => {
-                if (activeDocumentShapeId && activeDocumentFragmentId) {
-                    let liveFragment = null;
-                    try {
-                        liveFragment = Fragment.one('#' + activeDocumentFragmentId);
-                    } catch (error) {
+                if (activeDocumentTarget) {
+                    const shapeId = activeDocumentTarget.shapeId;
+                    const trackedEvent = documentTextTracker.activeEvents.get(shapeId);
+                    if (trackedEvent) {
+                        documentTextTracker.stop(shapeId, { ...trackedEvent.getEndData(), reason });
                     }
-                    const fragmentDocumentName = getDocumentNameFromFragment(liveFragment ?? activeDocumentFragment);
-                    const documentName = fragmentDocumentName || activeDocumentName || DEFAULT_DOCUMENT_NAME;
-
-                    documentTextTracker.stop(activeDocumentShapeId, {
-                        reason,
-                        editSource: activeDocumentEditSource,
-                        shapeId: activeDocumentShapeId,
-                        documentFragmentId: activeDocumentFragmentId,
-                        documentName,
-                        ['text' + END_SUFFIX]: (liveFragment ?? activeDocumentFragment)?.raw ?? ''
-                    });
                 }
-
-                unbindDocumentFragmentChangeListener();
-                activeDocumentShapeId = null;
-                activeDocumentFragmentId = null;
-                activeDocumentEditSource = null;
-                activeDocumentText = '';
-                activeDocumentName = '';
+                activeDocumentTarget = null;
             };
             stopTrackedDocumentEditing = stopCurrentDocumentEditTracking;
 
-            const getCanvasDocumentEditTarget = () => {
-                const editingShapeId = editor.getEditingShapeId();
-                if (!editingShapeId) {
-                    return null;
-                }
-
-                const editingShape = editor.getShape(editingShapeId);
-                if (!editingShape || editingShape.type !== 'Document') {
-                    return null;
-                }
-
-                const fragmentId = editingShape.props?.sourceFragmentId || '';
-                if (!fragmentId) {
-                    return null;
-                }
-
-                return {
-                    shapeId: editingShapeId,
-                    fragmentId,
-                    source: 'canvas'
-                };
-            };
-
-            const getFullscreenDocumentEditTarget = () => {
-                if (!fullscreenDocumentEditingState.isEditing) {
-                    return null;
-                }
-
-                const shapeId = fullscreenDocumentEditingState.shapeId || '';
-                const fragmentId = fullscreenDocumentEditingState.fragmentId || '';
-                if (!shapeId || !fragmentId) {
-                    return null;
-                }
-
-                const shape = editor.getShape(shapeId);
-                if (!shape || shape.type !== 'Document') {
-                    return null;
-                }
-
-                const shapeFragmentId = shape.props?.sourceFragmentId || '';
-                if (shapeFragmentId && shapeFragmentId !== fragmentId) {
-                    return null;
-                }
-
-                return {
-                    shapeId,
-                    fragmentId: shapeFragmentId || fragmentId,
-                    source: 'fullscreen'
-                };
-            };
-
-            const getActiveDocumentEditTarget = () => {
-                return getCanvasDocumentEditTarget() || getFullscreenDocumentEditTarget();
-            };
-
-            const isActiveDocumentEditTargetStillValid = () => {
-                if (!activeDocumentShapeId || !activeDocumentFragmentId || !activeDocumentEditSource) {
-                    return false;
-                }
-
-                const currentShape = editor.getShape(activeDocumentShapeId);
-                if (!currentShape || currentShape.type !== 'Document') {
-                    return false;
-                }
-
-                const currentFragmentId = currentShape.props?.sourceFragmentId || '';
-                if (currentFragmentId && currentFragmentId !== activeDocumentFragmentId) {
-                    return false;
-                }
-
-                if (activeDocumentEditSource === 'canvas') {
-                    return editor.getEditingShapeId() === activeDocumentShapeId;
-                }
-
-                if (activeDocumentEditSource === 'fullscreen') {
-                    const shapeId = fullscreenDocumentEditingState.shapeId || '';
-                    const fragmentId = fullscreenDocumentEditingState.fragmentId || '';
-                    return Boolean(
-                        fullscreenDocumentEditingState.isEditing
-                        && shapeId === activeDocumentShapeId
-                        && fragmentId === activeDocumentFragmentId
-                    );
-                }
-
-                return false;
-            };
-
             const syncDocumentEditTracking = () => {
-                const target = getActiveDocumentEditTarget();
-                if (!target) {
-                    stopCurrentDocumentEditTracking('edit-mode-exit');
-                    return;
-                }
+                const editingShapeId = editor.getEditingShapeId();
+                const editingShape = editingShapeId ? editor.getShape(editingShapeId) : null;
+                const fullscreenShape = fullscreenDocumentEditingState.isEditing
+                    ? editor.getShape(fullscreenDocumentEditingState.shapeId)
+                    : null;
+                const target = editingShape?.type === 'Document'
+                    ? { shapeId: editingShape.id, source: 'canvas' }
+                    : fullscreenShape?.type === 'Document'
+                        ? { shapeId: fullscreenShape.id, source: 'fullscreen' }
+                        : null;
 
-                let fragment = null;
-                try {
-                    fragment = Fragment.one('#' + target.fragmentId);
-                } catch (error) {
-                }
-                const hasFragmentListenerApi = fragment
-                    && typeof fragment.registerOnFragmentChangedHandler === 'function'
-                    && typeof fragment.unRegisterOnFragmentChangedHandler === 'function';
-                if (!hasFragmentListenerApi) {
-                    stopCurrentDocumentEditTracking('missing-fragment');
-                    return;
-                }
-
-                if (
-                    activeDocumentShapeId === target.shapeId
-                    && activeDocumentFragmentId === target.fragmentId
-                    && activeDocumentEditSource === target.source
-                ) {
-                    return;
-                }
-
-                stopCurrentDocumentEditTracking('edit-target-changed');
-                activeDocumentShapeId = target.shapeId;
-                activeDocumentFragmentId = target.fragmentId;
-                activeDocumentEditSource = target.source;
-                activeDocumentFragment = fragment;
-                activeDocumentText = fragment.raw;
-                const fragmentDocumentName = getDocumentNameFromFragment(fragment);
-                activeDocumentName = fragmentDocumentName || DEFAULT_DOCUMENT_NAME;
-
-                activeDocumentFragmentChangedHandler = () => {
-                    if (!isActiveDocumentEditTargetStillValid()) {
-                        stopCurrentDocumentEditTracking('edit-mode-exit');
-                        return;
-                    }
-
-                    const currentShape = editor.getShape(activeDocumentShapeId);
-                    if (!currentShape || currentShape.type !== 'Document') {
-                        stopCurrentDocumentEditTracking('edit-mode-exit');
-                        return;
-                    }
-
-                    const currentText = activeDocumentFragment.raw;
-                    if (currentText === activeDocumentText) {
-                        return;
-                    }
-
-                    const previousText = activeDocumentText;
-                    activeDocumentText = currentText;
-                    const fragmentDocumentName = getDocumentNameFromFragment(activeDocumentFragment);
-                    const documentName = fragmentDocumentName || activeDocumentName || DEFAULT_DOCUMENT_NAME;
-                    activeDocumentName = documentName;
-
-                    documentTextTracker.track(
-                        activeDocumentShapeId,
-                        {
-                            shapeId: activeDocumentShapeId,
-                            editSource: activeDocumentEditSource,
-                            documentFragmentId: activeDocumentFragmentId,
-                            documentName,
-                            ['text' + START_SUFFIX]: previousText
-                        },
-                        () => {
-                            let liveFragment = null;
-                            try {
-                                liveFragment = Fragment.one('#' + activeDocumentFragmentId);
-                            } catch (error) {
-                            }
-                            const liveFragmentDocumentName = getDocumentNameFromFragment(liveFragment ?? activeDocumentFragment);
-                            return {
-                                documentName: liveFragmentDocumentName || activeDocumentName || DEFAULT_DOCUMENT_NAME,
-                                ['text' + END_SUFFIX]: (liveFragment ?? activeDocumentFragment)?.raw ?? ''
-                            };
-                        }
-                    );
-                };
-
-                try {
-                    fragment.registerOnFragmentChangedHandler(activeDocumentFragmentChangedHandler);
-                } catch (error) {
-                    stopCurrentDocumentEditTracking('fragment-listener-error');
-                }
+                if (target?.shapeId === activeDocumentTarget?.shapeId
+                    && target?.source === activeDocumentTarget?.source) return;
+                stopCurrentDocumentEditTracking(target ? 'edit-target-changed' : 'edit-mode-exit');
+                activeDocumentTarget = target;
             };
 
             unsubscribeFullscreenEditing = subscribeEvent(FULLSCREEN_DOCUMENT_EDITING_CHANGED_EVENT, (state) => {
-                const shapeId = state?.shapeId || null;
-                const fragmentId = state?.fragmentId || null;
-
                 fullscreenDocumentEditingState = {
-                    isEditing: Boolean(state?.isEditing && shapeId && fragmentId),
-                    shapeId,
-                    fragmentId
+                    isEditing: Boolean(state?.isEditing && state?.shapeId),
+                    shapeId: state?.shapeId || null
                 };
                 syncDocumentEditTracking();
             });
@@ -388,8 +183,13 @@ export function Main() {
                             ['richText' + END_SUFFIX]: record.props?.richText
                         });
 
-                        if (record.id === activeDocumentShapeId) {
-                            stopCurrentDocumentEditTracking('deleted');
+                        if (record.type === 'Document') {
+                            documentTextTracker.stop(record.id, {
+                                documentName: record.props?.name || DEFAULT_DOCUMENT_NAME,
+                                textEnd: record.props?.text ?? '',
+                                reason: 'deleted'
+                            });
+                            if (activeDocumentTarget?.shapeId === record.id) activeDocumentTarget = null;
                         }
 
                         shapeDeletedStream.createInstantEvent({
@@ -401,6 +201,23 @@ export function Main() {
                 // Handle updated shapes
                 for (const [from, to] of Object.values(change.changes.updated)) {
                     if (from.typeName === 'shape' && to.typeName === 'shape') {
+
+                        if (to.type === 'Document' && from.props?.text !== to.props?.text) {
+                            documentTextTracker.track(to.id, {
+                                shapeId: to.id,
+                                documentName: to.props?.name || DEFAULT_DOCUMENT_NAME,
+                                editSource: activeDocumentTarget?.shapeId === to.id
+                                    ? activeDocumentTarget.source
+                                    : 'canvas',
+                                textStart: from.props?.text ?? ''
+                            }, () => {
+                                const currentShape = editor.getShape(to.id);
+                                return {
+                                    documentName: currentShape?.props?.name || to.props?.name || DEFAULT_DOCUMENT_NAME,
+                                    textEnd: currentShape?.props?.text ?? to.props?.text ?? ''
+                                };
+                            });
+                        }
 
                         if (from.props?.color !== to.props?.color) {
                             shapeColorChangedStream.createInstantEvent({
@@ -462,12 +279,15 @@ export function Main() {
         runAsync();
 
         return () => {
+            isCancelled = true;
             stopTrackedDocumentEditing?.('cleanup');
 
             // Cleanup trackers
             moveTrackerRef.current?.cleanup();
             textTrackerRef.current?.cleanup();
-            documentTextTrackerRef.current?.cleanup();
+            documentTextTrackerRef.current?.activeEvents.forEach((event, shapeId) => {
+                documentTextTrackerRef.current.stop(shapeId, { ...event.getEndData(), reason: 'cleanup' });
+            });
             moveTrackerRef.current = null;
             textTrackerRef.current = null;
             documentTextTrackerRef.current = null;

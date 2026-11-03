@@ -1,6 +1,10 @@
 {
     "description": "Session history persistence and playback utilities.",
-    "dependencies": [],
+    "dependencies": [
+        "#CoreHelpers",
+        "#ImportMapping",
+        "#EventSchema"
+    ],
     "assets": [],
     "version": "0.1.0"
 }

@@ -21,18 +21,6 @@ const getShapeTypeIcon = (shapeType) => {
     return shapeType === 'Document' ? 'description' : 'widgets';
 };
 
-const getFragmentById = (fragmentId) => {
-    if (!fragmentId || typeof Fragment === 'undefined' || typeof Fragment.one !== 'function') {
-        return null;
-    }
-
-    try {
-        return Fragment.one('#' + fragmentId);
-    } catch (error) {
-        return null;
-    }
-};
-
 const getWidgetDisplayName = (shape, index = 0) => {
     const providedName = typeof shape?.props?.name === 'string' ? shape.props.name.trim() : '';
     if (providedName) {
@@ -43,13 +31,8 @@ const getWidgetDisplayName = (shape, index = 0) => {
 };
 
 const getDocumentDisplayName = (shape, index = 0) => {
-    const sourceFragmentId = typeof shape?.props?.sourceFragmentId === 'string' ? shape.props.sourceFragmentId.trim() : '';
-    if (sourceFragmentId) {
-        const fragmentName = getFragmentById(sourceFragmentId)?.element?.getAttribute('name');
-        if (typeof fragmentName === 'string' && fragmentName.trim()) {
-            return fragmentName.trim();
-        }
-    }
+    const name = shape?.props?.name?.trim();
+    if (name) return name;
 
     return `Document ${index + 1}`;
 };
@@ -78,7 +61,7 @@ const getFullscreenShapeListFromEditor = (editor) => {
             id: shape.id,
             type: shapeType,
             name: shapeName,
-            sourceFragmentId: shape?.props?.sourceFragmentId || ''
+            sourceFragmentId: shapeType === 'Widget' ? (shape?.props?.sourceFragmentId || '') : ''
         });
     });
 

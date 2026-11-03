@@ -1,5 +1,5 @@
 import React from 'react';
-const { useEffect, useRef, useState, useMemo, useCallback } = React;
+const { useEffect, useLayoutEffect, useRef, useState, useMemo, useCallback } = React;
 
 import { createConnector } from '#SlopScript .connector-factory';
 import { AIChatComponent, AI_CHAT_DOM_STORE_KEY } from '#AIChatComponent .default';
@@ -7,15 +7,15 @@ import { useCookieState } from '#CoreHelpers .cookie-store';
 import { useDOMState, deleteDOMState } from '#CoreHelpers .dom-store';
 import { useGlobalEvents } from '#CoreHelpers .global-events';
 import { useModel } from '#ModelManager .default';
+import { MainAgent } from '#main-agent-slop';
 
 
 
 const DEFAULT_WIDTH = 400;
 const MIN_WIDTH = 384;
 const MAX_WIDTH = 800;
-
-const AGENT_FRAGMENT_ID = '#main-agent-slop';
-const { MainAgent } = await Fragment.one(AGENT_FRAGMENT_ID).require();
+const COLLAPSE_WIDTH = 300;
+const RESIZE_RESISTANCE = 0.3;
 
 const NEW_LOCAL_CHAT_NAME = 'New Chat';
 const NEW_SHARED_CHAT_NAME = 'New Shared Chat';
@@ -135,43 +135,73 @@ export function Main() {
 
     const [minimized, setMinimized] = useCookieState('ai-sidebar-minimized', false);
     const [width, setWidth] = useCookieState('ai-sidebar-width', DEFAULT_WIDTH);
-    const [isResizing, setIsResizing] = useState(false);
+    const [resizeWidth, setResizeWidth] = useState(null);
     const resizeStartRef = useRef(null);
+    const isResizing = resizeWidth !== null;
+    const visuallyMinimized = isResizing ? resizeWidth < COLLAPSE_WIDTH : minimized;
+    // Resist dragging below the minimum without changing the cursor-based collapse threshold.
+    const resistedResizeWidth = isResizing && resizeWidth < MIN_WIDTH
+        ? MIN_WIDTH - (MIN_WIDTH - resizeWidth) * RESIZE_RESISTANCE
+        : resizeWidth;
+    const displayedWidth = isResizing ? Math.max(0, Math.min(MAX_WIDTH, resistedResizeWidth)) : width;
 
     const startResize = (e) => {
+        if (e.button !== 0) return;
         e.preventDefault();
         resizeStartRef.current = {
             startX: e.clientX,
-            startWidth: width
+            startWidth: width,
+            currentWidth: width
         };
-        setIsResizing(true);
+        setResizeWidth(width);
     };
 
     useEffect(() => {
         if (!isResizing || !resizeStartRef.current) return;
 
         const handleMouseMove = (e) => {
-            const { startX, startWidth } = resizeStartRef.current;
+            const resize = resizeStartRef.current;
+            if (!resize) return;
+            const { startX, startWidth } = resize;
             const delta = startX - e.clientX;
-            setWidth(Math.max(MIN_WIDTH, Math.min(MAX_WIDTH, startWidth + delta)));
+            resize.currentWidth = startWidth + delta;
+            setResizeWidth(resize.currentWidth);
         };
 
-        const handleMouseUp = () => {
-            setIsResizing(false);
+        const finishResize = (e) => {
+            const resize = resizeStartRef.current;
+            if (!resize) return;
+            const finalWidth = e.type === 'mouseup'
+                ? resize.startWidth + resize.startX - e.clientX
+                : resize.currentWidth;
+            const shouldMinimize = finalWidth < COLLAPSE_WIDTH;
+            const expandedWidth = Math.max(MIN_WIDTH, Math.min(MAX_WIDTH, finalWidth));
+
+            // Commit only on release or blur; closing preserves the width from before the drag.
+            if (!shouldMinimize && expandedWidth !== width) {
+                setWidth(expandedWidth);
+            }
+            if (shouldMinimize !== minimized) {
+                setMinimized(shouldMinimize);
+            }
+            resizeStartRef.current = null;
+            setResizeWidth(null);
         };
 
         document.addEventListener('mousemove', handleMouseMove);
-        document.addEventListener('mouseup', handleMouseUp);
+        document.addEventListener('mouseup', finishResize);
+        window.addEventListener('blur', finishResize);
 
         return () => {
             document.removeEventListener('mousemove', handleMouseMove);
-            document.removeEventListener('mouseup', handleMouseUp);
+            document.removeEventListener('mouseup', finishResize);
+            window.removeEventListener('blur', finishResize);
         };
-    }, [isResizing]);
+    }, [isResizing, width, minimized, setWidth, setMinimized]);
 
-    useEffect(() => {
-        document.querySelector('#app-root').style.setProperty('--sidebar-width', `${minimized ? 0 : width}px`);
-    }, [minimized, width]);
+    useLayoutEffect(() => {
+        document.querySelector('#app-root').style.setProperty('--sidebar-width', `${visuallyMinimized ? 0 : displayedWidth}px`);
+    }, [visuallyMinimized, displayedWidth]);
 
 
 
@@ -678,59 +708,66 @@ export function Main() {
         return [...local, ...shared];
     }, [localTabs, sharedTabs]);
 
-    return <div className={`ai-sidebar${minimized ? ' minimized' : ''}${isResizing ? ' resizing' : ''}`}>
-        <div className="ai-sidebar-resize-handle" onMouseDown={startResize} />
-        <div className="ai-sidebar-tabs">
-            <TabRegion
-                title="Local Chats"
-                icon="person"
-                tabs={localTabs}
-                activeTabId={activeTabType === TAB_TYPES.LOCAL ? activeTabId : null}
-                processingTabs={processingTabs}
-                onSelectTab={(id) => selectTab(id, TAB_TYPES.LOCAL)}
-                onCloseTab={(id) => closeTab(id, TAB_TYPES.LOCAL)}
-                onAddTab={addLocalTab}
-            />
-            <TabRegion
-                title="Shared Chats"
-                icon="group"
-                tabs={sharedTabs}
-                activeTabId={activeTabType === TAB_TYPES.SHARED ? activeTabId : null}
-                processingTabs={processingTabs}
-                onSelectTab={(id) => selectTab(id, TAB_TYPES.SHARED)}
-                onCloseTab={(id) => closeTab(id, TAB_TYPES.SHARED)}
-                onAddTab={addSharedTab}
-                activeUsersMap={activeUsersMap}
-            />
-        </div>
+    return <>
+        {isResizing && <div
+            className="ai-sidebar-resize-overlay"
+            onMouseDown={(e) => e.preventDefault()}
+            onClick={(e) => e.stopPropagation()}
+        />}
+        <div className={`ai-sidebar${visuallyMinimized ? ' minimized' : ''}${isResizing ? ' resizing' : ''}`}>
+            <div className="ai-sidebar-resize-handle" onMouseDown={startResize} />
+            <div className="ai-sidebar-tabs">
+                <TabRegion
+                    title="Local Chats"
+                    icon="person"
+                    tabs={localTabs}
+                    activeTabId={activeTabType === TAB_TYPES.LOCAL ? activeTabId : null}
+                    processingTabs={processingTabs}
+                    onSelectTab={(id) => selectTab(id, TAB_TYPES.LOCAL)}
+                    onCloseTab={(id) => closeTab(id, TAB_TYPES.LOCAL)}
+                    onAddTab={addLocalTab}
+                />
+                <TabRegion
+                    title="Shared Chats"
+                    icon="group"
+                    tabs={sharedTabs}
+                    activeTabId={activeTabType === TAB_TYPES.SHARED ? activeTabId : null}
+                    processingTabs={processingTabs}
+                    onSelectTab={(id) => selectTab(id, TAB_TYPES.SHARED)}
+                    onCloseTab={(id) => closeTab(id, TAB_TYPES.SHARED)}
+                    onAddTab={addSharedTab}
+                    activeUsersMap={activeUsersMap}
+                />
+            </div>
 
-        <div className="ai-sidebar-chat">
-            {allTabs.map(tab => {
-                const handlers = getTabHandlers(tab.id, tab.type);
-                return <AIChatComponent
-                    key={tab.id}
-                    chatId={tab.id}
-                    profiles={getProfilesForTab(tab.id)}
-                    showProfileEditor={false}
-                    connectors={[]}
-                    showConnectorEditor={false}
-                    persisted={tab.type === TAB_TYPES.SHARED}
-                    hidden={!(activeTabId === tab.id && activeTabType === tab.type)}
-                    onEntriesChange={handlers.onEntriesChange}
-                    onProcessingChange={handlers.onProcessingChange}
-                    onReset={handlers.onReset}
-                    onControlState={getTabControlHandler(tab.id)}
-                />;
-            })}
-            {allTabs.length === 0 && (
-                <div className="no-active-chat">
-                    <span className="material-icons">chat</span>
-                    <p>No chat selected</p>
-                    <p>Create a new local or shared chat to get started</p>
-                </div>
-            )}
+            <div className="ai-sidebar-chat">
+                {allTabs.map(tab => {
+                    const handlers = getTabHandlers(tab.id, tab.type);
+                    return <AIChatComponent
+                        key={tab.id}
+                        chatId={tab.id}
+                        profiles={getProfilesForTab(tab.id)}
+                        showProfileEditor={false}
+                        connectors={[]}
+                        showConnectorEditor={false}
+                        persisted={tab.type === TAB_TYPES.SHARED}
+                        hidden={!(activeTabId === tab.id && activeTabType === tab.type)}
+                        onEntriesChange={handlers.onEntriesChange}
+                        onProcessingChange={handlers.onProcessingChange}
+                        onReset={handlers.onReset}
+                        onControlState={getTabControlHandler(tab.id)}
+                    />;
+                })}
+                {allTabs.length === 0 && (
+                    <div className="no-active-chat">
+                        <span className="material-icons">chat</span>
+                        <p>No chat selected</p>
+                        <p>Create a new local or shared chat to get started</p>
+                    </div>
+                )}
+            </div>
         </div>
-    </div>;
+    </>;
 }
 
 export const useAISidebar = () => {

@@ -17,6 +17,11 @@ cp "$TARGET_FILE" "$BACKUP_FILE"
 # Clean the file
 echo "Cleaning file: $TARGET_FILE"
 perl -0777 -pi -e '
+    # Set aside the raw contents of script and style elements, which are not
+    # HTML-escaped, so that the tag and attribute rewrites below cannot touch code
+    my @raw_contents;
+    s{(<(script|style)\b[^>]*>)(.*?)(</\2\s*>)}{push @raw_contents, $3; "$1\x00RAW" . $#raw_contents . "\x00$4"}gise;
+
     # Convert all tag names to lowercase (only actual HTML tags, not text content)
     # Match tags followed by whitespace, >, or /> to ensure they are real tags
     s/<(\/?[A-Za-z][A-Za-z0-9-]*)(\s|>|\/\s*>)/"<" . lc($1) . $2/eg;
@@ -87,6 +92,9 @@ perl -0777 -pi -e '
         $sorted_attrs = " " . $sorted_attrs if $sorted_attrs;
         "<$tag$sorted_attrs$close>";
     /egsx;
+
+    # Restore the raw contents of script and style elements
+    s/\x00RAW(\d+)\x00/$raw_contents[$1]/g;
 ' "$TARGET_FILE"
 
 echo "Done."

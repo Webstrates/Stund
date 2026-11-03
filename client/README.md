@@ -22,3 +22,12 @@ To overcome potential CORS issues, you can use a CDN:
 ```
 https://your-webstrates-server.com/new?prototypeUrl=https://cdn.jsdelivr.net/gh/Webstrates/Stund@main/client/prototypes/stund.zip
 ```
+
+
+## Updating the Deployment
+
+After replacing `prototypes/stund/index.html` and its assets with a new export, run the `update-deployment.sh` script. It cleans the prototype `index.html`, packages the `prototypes/stund` folder as `prototypes/stund.zip`, and creates `repository/stund.html` from the cleaned prototype.
+
+```
+./update-deployment.sh
+```

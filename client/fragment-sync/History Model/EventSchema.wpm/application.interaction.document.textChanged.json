@@ -1,6 +1,6 @@
 {
     "$schema": "http://json-schema.org/draft-07/schema#",
-    "description": "Schema for document text changed event. This is a duration event that tracks text changes in document fragments, batching rapid edits into a single event that ends after 1500ms of inactivity.",
+    "description": "Schema for document text changed event. This is a duration event that tracks text changes in Document shapes, batching rapid edits into a single event that ends after 1500ms of inactivity.",
     "type": "object",
     "properties": {
         "shapeId": {
@@ -9,7 +9,7 @@
         },
         "documentFragmentId": {
             "type": "string",
-            "description": "The fragment identifier backing the edited document"
+            "description": "Legacy fragment identifier, retained for historical events only"
         },
         "documentName": {
             "type": "string",
@@ -38,7 +38,6 @@
     },
     "required": [
         "shapeId",
-        "documentFragmentId",
         "documentName",
         "editSource",
         "textStart",

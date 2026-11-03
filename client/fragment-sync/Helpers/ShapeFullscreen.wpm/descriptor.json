@@ -1,6 +1,10 @@
 {
     "description": "Helper utilities for fullscreen behavior of canvas shapes.",
-    "dependencies": [],
+    "dependencies": [
+        "#ImportMapping",
+        "#CoreHelpers",
+        "#Document"
+    ],
     "assets": [],
     "version": "0.1.0"
 }

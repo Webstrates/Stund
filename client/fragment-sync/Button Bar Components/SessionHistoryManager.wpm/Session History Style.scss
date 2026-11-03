@@ -346,7 +346,24 @@
             color: #444;
         }
 
+        .session-id-details {
+            display: flex;
+            flex: 1;
+            min-width: 0;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 8px;
+
+            .session-id-actions {
+                display: flex;
+                gap: 4px;
+                margin-left: auto;
+            }
+        }
+
         .session-id {
+            overflow-wrap: anywhere;
+            min-width: 0;
             font-family: monospace;
             user-select: all;
             padding: 4px 8px;
@@ -414,7 +431,7 @@
             border: 1px solid #D0D0D0 !important;
             border-radius: 4px !important;
             background: #FFFFFF !important;
-            color: #0D47A1 !important;
+            color: #212121 !important;
             font-family: monospace;
             font-size: 13px;
             outline: none !important;
@@ -433,25 +450,6 @@
                 background: #F5F5F5 !important;
                 color: #757575 !important;
                 cursor: not-allowed;
-            }
-        }
-
-        .session-history-server-description {
-            color: #546E7A;
-            font-size: 11px;
-            overflow-wrap: anywhere;
-        }
-
-        &.invalid {
-            border-color: #EF9A9A;
-            background: #FFEBEE;
-
-            input.session-history-server-input {
-                border-color: #EF5350 !important;
-            }
-
-            .session-history-server-description {
-                color: #B71C1C;
             }
         }
     }
@@ -597,6 +595,140 @@
                 font-size: 11px;
                 color: #00000092;
                 font-family: sans-serif;
+            }
+        }
+    }
+}
+
+.session-history-dialog {
+    .session-history-token {
+        display: flex;
+        align-items: flex-start;
+        gap: 12px;
+        padding: 8px 12px;
+        background: #FFFFFF;
+        border: 1px solid #BBDEFB;
+        border-radius: 6px;
+
+        .info-label {
+            flex: 0 0 120px;
+            padding: 6px 0 0;
+            font-size: 13px;
+            font-weight: 600;
+            color: #444;
+            background: transparent;
+            border-radius: 0;
+        }
+
+        .token-content {
+            display: flex;
+            flex: 1;
+            min-width: 0;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .token-row {
+            display: flex;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin: 0;
+            min-height: 30px;
+        }
+
+        input.token-password-input {
+            flex: 1;
+            min-width: 140px;
+            box-sizing: border-box;
+            padding: 6px 10px !important;
+            border: 1px solid #D0D0D0 !important;
+            border-radius: 4px !important;
+            background: #FFFFFF !important;
+            color: #212121 !important;
+            font-size: 13px;
+            outline: none !important;
+            transition: all 0.15s ease;
+
+            &:hover:not(:disabled) {
+                border-color: #999999 !important;
+            }
+
+            &:focus {
+                border-color: #1976D2 !important;
+                box-shadow: 0 0 0 2px rgba(25, 118, 210, 0.15);
+            }
+
+            &:disabled {
+                background: #F5F5F5 !important;
+                color: #757575 !important;
+                cursor: not-allowed;
+            }
+        }
+
+        .dialog-action-button {
+            flex: 0 0 auto;
+            white-space: nowrap;
+        }
+
+        .token-status {
+            padding: 4px 8px;
+            border: 1px solid #388E3C;
+            border-radius: 4px;
+            background: #4CAF50;
+            color: #FFFFFF;
+            font-family: monospace;
+            font-size: 12px;
+        }
+
+        .token-expiry {
+            color: #546E7A;
+            font-size: 12px;
+        }
+
+        .token-actions {
+            display: flex;
+            gap: 4px;
+            margin-left: auto;
+        }
+
+        .token-hint {
+            color: #546E7A;
+            font-size: 11px;
+        }
+
+        &[data-status='expired'],
+        &[data-status='rejected'] {
+            border-color: #FFCC80;
+            background: #FFF8E1;
+
+            .token-hint {
+                color: #E65100;
+            }
+        }
+    }
+
+    .session-history-error {
+        margin: 0;
+        color: #C62828;
+        font-size: 12px;
+        overflow-wrap: anywhere;
+    }
+
+    @media (max-width: 600px) {
+        .session-history-server-setting,
+        .session-history-token {
+            flex-direction: column;
+            gap: 8px;
+
+            .info-label {
+                flex: 0 0 auto;
+                padding-top: 0;
+            }
+
+            .session-history-server-input-container,
+            .token-content {
+                width: 100%;
             }
         }
     }

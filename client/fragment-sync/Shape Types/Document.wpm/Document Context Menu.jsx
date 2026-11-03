@@ -26,27 +26,11 @@ export function Main() {
     const openEditor = useCallback(() => {
         if (!documentShape) return;
 
-        const runAsync = async () => {
-            if (typeof Cauldron === "undefined" || typeof Cauldron.Cauldron === "undefined") {
-                await WPMv2.require({ package: "Cauldron", repository: "cauldron-repos" });
-            }
-            if (typeof localCauldronEditor === "undefined") {
-                window.localCauldronEditor = new Cauldron.Cauldron();
-            }
-            localCauldronEditor.open();
-
-            const fragment = Fragment.one('#' + documentShape.props.sourceFragmentId);
-
-            if (!fragment) {
-                console.warn('Document fragment not found:', documentShape.props.sourceFragmentId);
-                return;
-            }
-
-            EventSystem.triggerEvent("Cauldron.Open.FragmentEditor", { fragment });
-        };
-
-        runAsync();
-    }, [documentShape]);
+        setFullscreenShapeId(null);
+        editor.setCurrentTool('select');
+        editor.setEditingShape(documentShape.id);
+        editor.setCurrentTool('select.editing_shape', {});
+    }, [editor, documentShape, setFullscreenShapeId]);
 
     const toggleFullscreen = useCallback(() => {
         if (!documentShape) return;

@@ -101,9 +101,35 @@ export function ShapePreviewTile({
     </div>;
 }
 
-function ChatEntry({ entry, type, menuOverlay, imagePreviews = [] }) {
+function getReplyDurationMs(entry, userEntry) {
+    if (entry.type !== 'assistant' || !entry.hasResult || entry.cancelled || entry.exception || userEntry?.type !== 'user') {
+        return null;
+    }
+
+    if (!Number.isFinite(entry.timestampEpoch) || !Number.isFinite(userEntry.timestampEpoch)) {
+        return null;
+    }
+
+    const durationMs = entry.timestampEpoch - userEntry.timestampEpoch;
+    return Number.isFinite(durationMs) && durationMs >= 0 ? durationMs : null;
+}
+
+function formatReplyDuration(durationMs) {
+    const totalSeconds = Math.round(durationMs / 1000);
+    if (totalSeconds < 60) {
+        return `${totalSeconds}s`;
+    }
+
+    return `${Math.floor(totalSeconds / 60)}m ${totalSeconds % 60}s`;
+}
+
+function ChatEntry({ entry, type, menuOverlay, imagePreviews = [], durationMs = null }) {
     const entryRef = useRef(null);
     const [isProgressExpanded, setIsProgressExpanded] = useState(false);
+    const timestampDate = new Date(Number.isFinite(entry.timestampEpoch) ? entry.timestampEpoch : entry.timestampIso || NaN);
+    const timestampTitle = Number.isFinite(timestampDate.getTime())
+        ? timestampDate.toLocaleString(undefined, { dateStyle: 'full', timeStyle: 'long' })
+        : undefined;
     const validImagePreviews = Array.isArray(imagePreviews)
         ? imagePreviews
             .map((preview) => {
@@ -327,7 +353,10 @@ function ChatEntry({ entry, type, menuOverlay, imagePreviews = [] }) {
             </div>}
             <div className="tagline">
                 <div className="author">{entry.author || ''}</div>
-                <div className="timestamp">{entry.timestamp || ''}</div>
+                <div className="timestamp" title={timestampTitle}>
+                    {entry.timestamp || ''}
+                    {entry.timestamp && durationMs !== null && ` · ${formatReplyDuration(durationMs)}`}
+                </div>
             </div>
         </div>
     </div>;
@@ -574,6 +603,9 @@ export function ChatHistory({
     entryImagePreviews
 }) {
     const historyRef = useRef(null);
+    const userEntriesById = new Map(entries
+        .filter(entry => entry.type === 'user' && typeof entry.id === 'string')
+        .map(entry => [entry.id, entry]));
 
     useEffect(() => {
         if (!persisted || !historyRef.current) {
@@ -594,15 +626,23 @@ export function ChatHistory({
                 <span className="text">No AI connector configured. Chat is disabled.</span>
             </div>
         )}
-        {entries.map(entry => (
-            <ChatEntry
+        {entries.map((entry, index) => {
+            const userEntryId = typeof entry.id === 'string' && entry.id.startsWith('assistant-')
+                ? `user-${entry.id.slice('assistant-'.length)}`
+                : null;
+            const previousEntry = entries[index - 1];
+            const userEntry = userEntriesById.get(userEntryId)
+                || (previousEntry?.type === 'user' ? previousEntry : null);
+
+            return <ChatEntry
                 key={entry.id}
                 entry={entry}
                 type={entry.type}
                 menuOverlay={menuOverlay}
                 imagePreviews={entryImagePreviews[entry.id] || []}
-            />
-        ))}
+                durationMs={getReplyDurationMs(entry, userEntry)}
+            />;
+        })}
     </div>;
 }
 

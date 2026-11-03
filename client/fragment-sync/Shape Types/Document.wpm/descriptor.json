@@ -1,6 +1,13 @@
 {
     "description": "Document shape type integration for the canvas.",
-    "dependencies": [],
+    "dependencies": [
+        "#ImportMapping",
+        "#CoreHelpers",
+        "#CanvasHelpers",
+        "codestrates-repos fragment_markdown",
+        "codestrates-repos editor_core",
+        "codestrates-repos editor_monaco"
+    ],
     "assets": [],
     "version": "0.1.0"
 }

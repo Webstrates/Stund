@@ -17,11 +17,11 @@ import { convertAndValidateShapes as baseConvertAndValidateShapes } from '#Canva
 import { getModel } from '#ModelManager .default';
 import { useSessionIngest } from '#SessionHistory .default';
 import {
-    createDocumentFragment as baseCreateDocumentFragment,
-    getDocumentFragmentTextByFragmentId as baseGetDocumentFragmentTextByFragmentId,
-    getDocumentFragmentNameByFragmentId as baseGetDocumentFragmentNameByFragmentId,
-    setDocumentFragmentTextByFragmentId as baseSetDocumentFragmentTextByFragmentId,
-    setDocumentFragmentNameByFragmentId as baseSetDocumentFragmentNameByFragmentId
+    createDocument as baseCreateDocument,
+    getDocumentText as baseGetDocumentText,
+    getDocumentName as baseGetDocumentName,
+    setDocumentText as baseSetDocumentText,
+    setDocumentName as baseSetDocumentName
 } from '#Document .helpers';
 
 export {
@@ -29,11 +29,11 @@ export {
     baseRecordAudio as recordAudio,
     baseGetTranscriptionSupportedMimeType as getTranscriptionSupportedMimeType,
     baseConvertAndValidateShapes as convertAndValidateShapes,
-    baseCreateDocumentFragment as createDocumentFragment,
-    baseGetDocumentFragmentTextByFragmentId as getDocumentFragmentTextByFragmentId,
-    baseGetDocumentFragmentNameByFragmentId as getDocumentFragmentNameByFragmentId,
-    baseSetDocumentFragmentTextByFragmentId as setDocumentFragmentTextByFragmentId,
-    baseSetDocumentFragmentNameByFragmentId as setDocumentFragmentNameByFragmentId
+    baseCreateDocument as createDocument,
+    baseGetDocumentText as getDocumentText,
+    baseGetDocumentName as getDocumentName,
+    baseSetDocumentText as setDocumentText,
+    baseSetDocumentName as setDocumentName
 };
 
 

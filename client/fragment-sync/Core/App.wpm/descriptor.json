@@ -2,6 +2,7 @@
     "description": "The main app package.",
     "dependencies": [
         "#ImportMapping",
+        "#CoreHelpers",
         "codestrates-repos editor_core",
         "codestrates-repos editor_preview",
         "codestrates-repos fragment_js_babel",

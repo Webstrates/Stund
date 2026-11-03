@@ -10,17 +10,17 @@
     "theme_color": "#222222",
     "icons": [
         {
-            "src": "stund-icons.zip/icon_512.png",
+            "src": "icon_512.png",
             "type": "image/png",
             "sizes": "512x512"
         },
         {
-            "src": "stund-icons.zip/icon_128.png",
+            "src": "icon_128.png",
             "type": "image/png",
             "sizes": "128x128"
         },
         {
-            "src": "stund-icons.zip/icon_32.png",
+            "src": "icon_32.png",
             "type": "image/png",
             "sizes": "32x32"
         }

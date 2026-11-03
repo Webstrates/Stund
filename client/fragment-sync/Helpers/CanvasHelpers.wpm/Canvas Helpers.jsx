@@ -1,4 +1,28 @@
-import { toRichText } from 'tldraw';
+import { isAccelKey, normalizeWheel, toRichText } from 'tldraw';
+
+export function forwardShapeZoomWheel(editor, event) {
+    if (!event.ctrlKey && !event.metaKey) return false;
+
+    event.preventDefault();
+    event.stopPropagation();
+
+    const delta = normalizeWheel(event);
+    if (delta.x === 0 && delta.y === 0) return true;
+
+    editor.dispatch({
+        type: 'wheel',
+        name: 'wheel',
+        delta,
+        point: { x: event.clientX, y: event.clientY },
+        shiftKey: event.shiftKey,
+        altKey: event.altKey,
+        ctrlKey: event.metaKey || event.ctrlKey,
+        metaKey: event.metaKey,
+        accelKey: isAccelKey(event)
+    });
+
+    return true;
+}
 
 
 
@@ -48,6 +72,10 @@ const stringifyShapeInput = (shapeInput) => {
 };
 
 const normalizeRichTextProps = (shape) => {
+    if (shape.type === 'Document') {
+        return;
+    }
+
     if (!shape?.props || typeof shape.props !== 'object') {
         return;
     }

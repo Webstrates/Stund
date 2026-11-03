@@ -125,7 +125,6 @@ function formatExportSummary(result) {
     return [
         `Canvas records: ${summary.canvasRecordCount || 0}`,
         `Canvas schema included: ${summary.canvasSchemaIncluded ? 'Yes' : 'No'}`,
-        `Document fragments: ${summary.documentFragmentCount || 0}`,
         `Widget fragments: ${summary.widgetFragmentCount || 0}`,
         `Processor fragments: ${summary.processorFragmentCount || 0}`,
         `Widget stores: ${summary.widgetStoreCount || 0}`,
@@ -140,7 +139,6 @@ function formatImportSummary(result) {
     const lines = [
         `Canvas records imported: ${summary.canvasRecordCount || 0}`,
         `Canvas schema imported: ${summary.canvasSchemaIncluded ? 'Yes' : 'No'}`,
-        `Document fragments imported: ${summary.documentFragmentCount || 0}`,
         `Widget fragments imported: ${summary.widgetFragmentCount || 0}`,
         `Processor fragments imported: ${summary.processorFragmentCount || 0}`,
         `Widget stores imported: ${summary.widgetStoreCount || 0}`,
@@ -381,7 +379,7 @@ export function Main() {
                 <div className="dialog-toggle-list">
                     <DialogToggleRow
                         label="Canvas State"
-                        description="Includes canvas records and will overwrite the current board on import."
+                        description="Includes canvas records and document Markdown; overwrites the current board on import."
                         checked={selection.canvasState}
                         onChange={(checked) => updateSelection('canvasState', checked)}
                         disabled={isBusy}
@@ -392,13 +390,6 @@ export function Main() {
                         checked={selection.canvasImageAssets}
                         onChange={(checked) => updateSelection('canvasImageAssets', checked)}
                         disabled={isBusy || !selection.canvasState}
-                    />
-                    <DialogToggleRow
-                        label="Document Markdown Fragments"
-                        description="Imports overwrite local document fragments with matching IDs."
-                        checked={selection.documentFragments}
-                        onChange={(checked) => updateSelection('documentFragments', checked)}
-                        disabled={isBusy}
                     />
                     <DialogToggleRow
                         label="Widget Code Fragments"

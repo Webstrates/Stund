@@ -5,4 +5,4 @@ This folder contains the repostiory of the WPM ([Webstrates Package Manager](htt
 
 ## Updating the Repository File
 
-To update the repository file, run the `update-repo-file.sh` script. The script takes the current `index.html` file from the prototype and removes all unnecessary elements.
+To update the repository file, run the `clean-repository-html.sh` script. The script takes the current `index.html` file from the prototype and removes all unnecessary elements. The `update-deployment.sh` script in the `client` folder runs this step together with cleaning and packaging the prototype.

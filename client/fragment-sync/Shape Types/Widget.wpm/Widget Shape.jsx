@@ -4,6 +4,7 @@ import { ErrorBoundary } from 'react-error-boundary';
 import { T, HTMLContainer, BaseBoxShapeUtil, stopEventPropagation, useEditor, useValue } from 'tldraw';
 
 import { useCookieState } from '#CoreHelpers .cookie-store';
+import { forwardShapeZoomWheel } from '#CanvasHelpers .default';
 
 
 
@@ -314,13 +315,21 @@ function WidgetComponent({ shape, isEditing }) {
         const interactiveContainer = widgetContainerRef.current;
         if (!interactiveContainer) return;
 
+        // Capture zoom before the embedded widget consumes it.
+        const handleZoomWheelCapture = (event) => {
+            if (!editor.getSelectedShapeIds().includes(shape.id) && !isEditing) return;
+            forwardShapeZoomWheel(editor, event);
+        };
+
         const handleWheel = (event) => {
             if (!editor.getSelectedShapeIds().includes(shape.id) && !isEditing) return;
             event.stopPropagation();
         };
 
+        interactiveContainer.addEventListener('wheel', handleZoomWheelCapture, { capture: true, passive: false });
         interactiveContainer.addEventListener('wheel', handleWheel);
         return () => {
+            interactiveContainer.removeEventListener('wheel', handleZoomWheelCapture, { capture: true });
             interactiveContainer.removeEventListener('wheel', handleWheel);
         };
     }, [editor, shape.id, isEditing]);

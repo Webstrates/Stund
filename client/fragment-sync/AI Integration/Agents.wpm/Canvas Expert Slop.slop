@@ -2,12 +2,13 @@ import { cleanShapesData } from '#MeetingRecorder .recorder-helpers';
 import { getModel } from '#ModelManager .default';
 import { generateImageAsset } from '#AIHelpers .default';
 import { convertAndValidateShapes } from '#CanvasHelpers .default';
+import * as shapeSchema from '#EventSchema .shape-schema';
 import {
-    createDocumentFragment as createDocumentFragmentHelper,
-    getDocumentFragmentTextByFragmentId as getDocumentFragmentTextByFragmentIdHelper,
-    getDocumentFragmentNameByFragmentId as getDocumentFragmentNameByFragmentIdHelper,
-    setDocumentFragmentTextByFragmentId as setDocumentFragmentTextByFragmentIdHelper,
-    setDocumentFragmentNameByFragmentId as setDocumentFragmentNameByFragmentIdHelper
+    createDocument as createDocumentHelper,
+    getDocumentText as getDocumentTextHelper,
+    getDocumentName as getDocumentNameHelper,
+    setDocumentText as setDocumentTextHelper,
+    setDocumentName as setDocumentNameHelper
 } from '#Document .helpers';
 
 
@@ -36,11 +37,7 @@ export class CanvasExpert {
         returns: { type: 'object' }
     })
     getShapeSchema() {
-        const fragment = Fragment.one(`code-fragment[name="shape"]`);
-        if (!fragment) {
-            throw new Error(`No schema found for shape.`);
-        }
-        return JSON.parse(fragment.raw);
+        return structuredClone(shapeSchema);
     }
 
     @Tool({
@@ -150,7 +147,7 @@ export class CanvasExpert {
 
 
     @Tool({
-        description: 'Creates a document fragment that can be linked from a Document shape and returns the fragment ID.',
+        description: 'Creates a self-contained Document shape at the viewport center and returns its shape ID.',
         parameters: {
             type: 'object',
             properties: {
@@ -160,7 +157,7 @@ export class CanvasExpert {
                 },
                 textContent: {
                     type: 'string',
-                    description: 'Optional markdown content for the fragment.'
+                    description: 'Optional markdown content for the document.'
                 }
             },
             required: [],
@@ -168,113 +165,113 @@ export class CanvasExpert {
         },
         returns: { type: 'string' }
     })
-    createDocumentFragment(name, textContent) {
-        const fragmentId = createDocumentFragmentHelper(name, textContent);
-        return fragmentId;
+    createDocument(name, textContent) {
+        const shapeId = createDocumentHelper(name, textContent);
+        return shapeId;
     }
 
     @Tool({
-        description: 'Retrieves markdown text content by document fragment ID.',
+        description: 'Retrieves markdown text content by document shape ID.',
         parameters: {
             type: 'object',
             properties: {
-                fragmentId: {
+                shapeId: {
                     type: 'string',
-                    description: 'The document fragment ID.'
+                    description: 'The document shape ID.'
                 }
             },
-            required: ['fragmentId'],
+            required: ['shapeId'],
             additionalProperties: false
         },
         returns: { type: 'string' }
     })
-    getDocumentFragmentTextByFragmentId(fragmentId) {
-        const textContent = getDocumentFragmentTextByFragmentIdHelper(fragmentId);
+    getDocumentText(shapeId) {
+        const textContent = getDocumentTextHelper(shapeId);
         if (textContent === null) {
-            throw new Error(`No document fragment found with ID ${fragmentId}.`);
+            throw new Error(`No document shape found with ID ${shapeId}.`);
         }
 
         return textContent;
     }
 
     @Tool({
-        description: 'Retrieves the document name by document fragment ID.',
+        description: 'Retrieves the document name by document shape ID.',
         parameters: {
             type: 'object',
             properties: {
-                fragmentId: {
+                shapeId: {
                     type: 'string',
-                    description: 'The document fragment ID.'
+                    description: 'The document shape ID.'
                 }
             },
-            required: ['fragmentId'],
+            required: ['shapeId'],
             additionalProperties: false
         },
         returns: { type: 'string' }
     })
-    getDocumentFragmentNameByFragmentId(fragmentId) {
-        const name = getDocumentFragmentNameByFragmentIdHelper(fragmentId);
+    getDocumentName(shapeId) {
+        const name = getDocumentNameHelper(shapeId);
         if (name === null) {
-            throw new Error(`No document fragment found with ID ${fragmentId}.`);
+            throw new Error(`No document shape found with ID ${shapeId}.`);
         }
 
         return name;
     }
 
     @Tool({
-        description: 'Updates markdown text content by document fragment ID.',
+        description: 'Updates markdown text content by document shape ID.',
         parameters: {
             type: 'object',
             properties: {
-                fragmentId: {
+                shapeId: {
                     type: 'string',
-                    description: 'The document fragment ID.'
+                    description: 'The document shape ID.'
                 },
                 textContent: {
                     type: 'string',
                     description: 'The new markdown text content.'
                 }
             },
-            required: ['fragmentId', 'textContent'],
+            required: ['shapeId', 'textContent'],
             additionalProperties: false
         },
         returns: { type: 'string' }
     })
-    setDocumentFragmentTextByFragmentId(fragmentId, textContent) {
-        const updated = setDocumentFragmentTextByFragmentIdHelper(fragmentId, textContent);
+    setDocumentText(shapeId, textContent) {
+        const updated = setDocumentTextHelper(shapeId, textContent);
         if (!updated) {
-            throw new Error(`No document fragment found with ID ${fragmentId}.`);
+            throw new Error(`No document shape found with ID ${shapeId}.`);
         }
 
-        return `Document fragment text updated successfully for fragment ID ${fragmentId}`;
+        return `Document text updated successfully for shape ID ${shapeId}`;
     }
 
     @Tool({
-        description: 'Updates the document name by document fragment ID.',
+        description: 'Updates the document name by document shape ID.',
         parameters: {
             type: 'object',
             properties: {
-                fragmentId: {
+                shapeId: {
                     type: 'string',
-                    description: 'The document fragment ID.'
+                    description: 'The document shape ID.'
                 },
                 name: {
                     type: 'string',
                     description: 'The new document name.'
                 }
             },
-            required: ['fragmentId', 'name'],
+            required: ['shapeId', 'name'],
             additionalProperties: false
         },
         returns: { type: 'string' }
     })
-    setDocumentFragmentNameByFragmentId(fragmentId, name) {
-        const updated = setDocumentFragmentNameByFragmentIdHelper(fragmentId, name);
+    setDocumentName(shapeId, name) {
+        const updated = setDocumentNameHelper(shapeId, name);
         if (!updated) {
-            throw new Error(`No document fragment found with ID ${fragmentId}.`);
+            throw new Error(`No document shape found with ID ${shapeId}.`);
         }
 
-        return `Document fragment name updated successfully for fragment ID ${fragmentId}`;
+        return `Document name updated successfully for shape ID ${shapeId}`;
     }
 
 
@@ -472,8 +469,8 @@ export class CanvasExpert {
 
             this.getAvailableWidgetsFromWidgetRepository,
 
-            this.getDocumentFragmentTextByFragmentId,
-            this.getDocumentFragmentNameByFragmentId
+            this.getDocumentText,
+            this.getDocumentName
         ];
 
         if (baseContext.writeAccess) {
@@ -484,9 +481,9 @@ export class CanvasExpert {
 
                 this.createGeneratedImageShape,
 
-                this.createDocumentFragment,
-                this.setDocumentFragmentTextByFragmentId,
-                this.setDocumentFragmentNameByFragmentId
+                this.createDocument,
+                this.setDocumentText,
+                this.setDocumentName
             );
         }
 
@@ -624,7 +621,7 @@ You receive canvas context in baseContext:
 - If write access is not enabled but the user requests changes, explain that write access is not enabled
 - Remember that y increases downward
 - For text shapes, write text through props.text and read rich text from props.richText
-- For Document shapes, use document fragment tools to read/write markdown content and do not expect document text in props.text
+- For Document shapes, read/write Markdown in props.text and the document title in props.name
 
 
 ## Tools
@@ -644,13 +641,13 @@ Use for:
 - Calculations and aggregations across shapes
 - Always filter first; do not request all shapes when a narrower query is possible
 
-### getDocumentFragmentTextByFragmentId (read access)
+### getDocumentText (read access)
 
 Use when:
-- You need markdown content from a Document fragment
+- You need Markdown content from a Document shape
 - The user asks what a document contains
 
-### getDocumentFragmentNameByFragmentId (read access)
+### getDocumentName (read access)
 
 Use when:
 - You need to read the current name/title of a document
@@ -672,21 +669,21 @@ Use when the user wants to remove shapes from the canvas.
 
 Use when the user wants to generate an image from a text prompt and place it on the canvas.
 
-### createDocumentFragment (write access)
+### createDocument (write access)
 
-Use when the user asks to create a new document fragment or when you need a new fragment id for a new Document shape.
+Use to create a new Document shape directly. Do not create another shape to reference its returned shape ID.
 
-### setDocumentFragmentTextByFragmentId (write access)
+### setDocumentText (write access)
 
 Use when:
 - The user asks to change document markdown text
-- You need to write content into an existing document fragment
+- You need to write content into an existing Document shape
 
-### setDocumentFragmentNameByFragmentId (write access)
+### setDocumentName (write access)
 
 Use when:
 - The user asks to rename a document
-- You need to update the title/name of an existing document fragment
+- You need to update the title/name of an existing Document shape
 
 
 
@@ -697,11 +694,11 @@ Use when:
 - Note dimensions: 190x190 pixels (you cannot change this)
 - Position: x, y coordinates with top-left origin
 - Text in shapes: set text with props.text; read TipTap rich text from props.richText
-- Document shapes store markdown in linked fragments (props.sourceFragmentId), not in props.text
+- Document shapes store Markdown directly in props.text and their title in props.name
 
 Custom shape types:
 - Widget: interactive widget shape (internal widget code is handled by another expert)
-- Document: markdown document shape linked to a document fragment via props.sourceFragmentId
+- Document: self-contained Markdown document with props.text and props.name
 - VideoStream: participant webcam stream
 - ScreenStream: participant live screen sharing stream
 
@@ -711,9 +708,9 @@ Custom shape types:
 - Creating shapes: place new shapes within the visible viewport and do not set IDs
 - Positioning: use viewport center as default location
 - Layout: maintain 20-30px spacing between nearby shapes
-- Longer text elements: use a "Document" shape with linked fragment for longer text instead of a cramped "Note"
-- For Document shape content edits, use setDocumentFragmentTextByFragmentId
-- For Document shape renaming, use setDocumentFragmentNameByFragmentId
+- Longer text elements: use a "Document" shape for longer text instead of a cramped "Note"
+- For Document shape content edits, use setDocumentText
+- For Document shape renaming, use setDocumentName
 - Updates: only modify fields that must change
 - Avoid overlap and verify spatial sense before executing
 - Always adhere to the shape schema or writes will be rejected

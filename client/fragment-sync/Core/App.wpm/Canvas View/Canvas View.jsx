@@ -7,6 +7,8 @@ import { uiOverrides, components, assetUrls } from '#App .editor-changes';
 import { useDOMSync } from '#App .dom-sync';
 import { WebstrateAssetStore } from '#App .webstrate-asset-store';
 
+// Paste your tldraw license key here. Watermark visibility depends on the license type.
+const tldrawLicenseKey = '';
 
 
 export function CanvasView({ shapeUtils, tools, counter }) {
@@ -21,6 +23,7 @@ export function CanvasView({ shapeUtils, tools, counter }) {
 
     const tldraw = useMemo(() => (
         <Tldraw key={shapeUtils.map(s => s.type).join(',') + counter}
+            licenseKey={tldrawLicenseKey || undefined}
             store={store}
             shapeUtils={shapeUtils}
             tools={tools}

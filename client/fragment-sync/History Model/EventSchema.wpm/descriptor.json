@@ -1,6 +1,8 @@
 {
     "description": "Event schema definitions for session history data.",
-    "dependencies": [],
+    "dependencies": [
+        "codestrates-repos fragment_json"
+    ],
     "assets": [],
     "version": "0.1.0"
 }

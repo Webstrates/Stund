@@ -8,6 +8,7 @@ import {
     react
 } from 'tldraw';
 import { migrateTldrawStore } from '#App .tldraw-migration';
+import { readLastJsonObject } from '#CoreHelpers .string-utils';
 
 
 
@@ -92,10 +93,9 @@ export function useDOMSync({ store, node }) {
             node.appendChild(createRecordElement(record));
         }
 
-        function changeRecord(record) {
+        function upsertRecord(record) {
             const element = findElement(record);
             if (!element) {
-                console.warn(`Adding missing persisted tldraw record ${record.id}.`);
                 addRecord(record);
                 return;
             }
@@ -110,8 +110,9 @@ export function useDOMSync({ store, node }) {
         }
 
         function readRecordElement(element) {
-            const record = JSON.parse(element.textContent || '');
-            if (!record || typeof record.id !== 'string' || !record.id.includes(':')) {
+            const expectedId = `${element.tagName.toLowerCase()}:${element.id}`;
+            const record = readLastJsonObject(element, (value) => value.id === expectedId);
+            if (!record) {
                 throw new Error(`Invalid tldraw record in <${element.tagName.toLowerCase()}>.`);
             }
             return record;
@@ -125,7 +126,7 @@ export function useDOMSync({ store, node }) {
             const schemaElement = getSchemaElement();
             if (!schemaElement) return null;
 
-            const schema = JSON.parse(schemaElement.textContent || '');
+            const schema = readLastJsonObject(schemaElement);
             if (!schema || typeof schema !== 'object' || Array.isArray(schema)) {
                 throw new Error('The persisted tldraw schema is invalid.');
             }
@@ -284,8 +285,11 @@ export function useDOMSync({ store, node }) {
 
         function executeNonObserved(method) {
             stopObserver();
-            method();
-            startObserver();
+            try {
+                method();
+            } finally {
+                startObserver();
+            }
         }
 
         try {
@@ -305,14 +309,21 @@ export function useDOMSync({ store, node }) {
             });
 
             cleanups.push(store.listen(function syncTldrawToDOM({ changes }) {
-                Object.values(changes.added).forEach((record) => {
-                    executeNonObserved(() => addRecord(record));
-                });
-                Object.values(changes.updated).forEach(([, record]) => {
-                    executeNonObserved(() => changeRecord(record));
-                });
-                Object.values(changes.removed).forEach((record) => {
-                    executeNonObserved(() => removeRecord(record));
+                if (isReplacingCanvasState) return;
+                const recordIds = new Set([
+                    ...Object.keys(changes.added),
+                    ...Object.keys(changes.updated),
+                    ...Object.keys(changes.removed)
+                ]);
+
+                executeNonObserved(() => {
+                    // Draining queued remote mutations can supersede this event.
+                    // Persist the current store values, including deletions.
+                    recordIds.forEach((id) => {
+                        const record = store.get(id);
+                        if (record) upsertRecord(record);
+                        else removeRecord({ id });
+                    });
                 });
             }, { source: 'user', scope: 'document' }));
 

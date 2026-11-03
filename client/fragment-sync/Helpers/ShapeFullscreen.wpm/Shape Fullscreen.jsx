@@ -5,7 +5,8 @@ import { ErrorBoundary } from 'react-error-boundary';
 
 import { useCookieState } from '#CoreHelpers .cookie-store';
 import { useGlobalEvents } from '#CoreHelpers .global-events';
-import { ReactPreviewEditor } from '#Document .react-preview-editor';
+import { ReactPreviewEditor, ReactDocumentEditor } from '#Document .react-preview-editor';
+import { useDocumentFragment } from '#Document .helpers';
 
 
 
@@ -13,7 +14,6 @@ const FULLSCREEN_SHAPE_STATE_KEY = 'fullscreen-shape-id';
 const SUPPORTED_FULLSCREEN_SHAPE_TYPES = ['Widget', 'Document'];
 const RELOAD_DEBOUNCE_MS = 1000;
 const EDITOR_POLL_INTERVAL_MS = 700;
-const DOCUMENT_DEPENDENCY_POLL_INTERVAL_MS = 300;
 const FULLSCREEN_DOCUMENT_EDITING_CHANGED_EVENT = 'stund-fullscreen-document-editing-changed';
 const FULLSCREEN_DOCUMENT_EDITING_REQUEST_EVENT = 'stund-fullscreen-document-editing-request';
 const DEFAULT_DOCUMENT_FONT_SIZE = 14;
@@ -35,34 +35,6 @@ const isSupportedFullscreenShapeType = (shapeType) => {
     return SUPPORTED_FULLSCREEN_SHAPE_TYPES.includes(shapeType);
 };
 
-const getEditorRootNode = (editorInstance) => {
-    if (!editorInstance?.html || typeof Node === 'undefined') {
-        return null;
-    }
-
-    if (editorInstance.html[0] instanceof Node) {
-        return editorInstance.html[0];
-    }
-
-    if (editorInstance.html instanceof Node) {
-        return editorInstance.html;
-    }
-
-    return null;
-};
-
-const getFragmentById = (fragmentId) => {
-    if (!fragmentId || typeof Fragment === 'undefined' || typeof Fragment.one !== 'function') {
-        return null;
-    }
-
-    try {
-        return Fragment.one('#' + fragmentId);
-    } catch (error) {
-        return null;
-    }
-};
-
 const getShapeTypeLabel = (shapeType) => {
     if (shapeType === 'Document') {
         return 'Document';
@@ -81,13 +53,8 @@ const getWidgetDisplayName = (shape, index = 0) => {
 };
 
 const getDocumentDisplayName = (shape, index = 0) => {
-    const sourceFragmentId = typeof shape?.props?.sourceFragmentId === 'string' ? shape.props.sourceFragmentId.trim() : '';
-    if (sourceFragmentId) {
-        const fragmentName = getFragmentById(sourceFragmentId)?.element?.getAttribute('name');
-        if (typeof fragmentName === 'string' && fragmentName.trim()) {
-            return fragmentName.trim();
-        }
-    }
+    const name = shape?.props?.name?.trim();
+    if (name) return name;
 
     return `Document ${index + 1}`;
 };
@@ -289,134 +256,22 @@ function FullscreenWidgetContent({ shape }) {
 }
 
 function FullscreenDocumentContent({ shape, isEditing }) {
-    const [loadError, setLoadError] = useState(null);
-    const [reloadKey, setReloadKey] = useState(0);
-    const editorContainerRef = useRef(null);
-    const editorInstanceRef = useRef(null);
-
-    const sourceFragmentId = shape?.props?.sourceFragmentId || null;
-    const fontSize = shape?.props?.fontSize || 14;
-
-    const unloadDocumentEditor = useCallback(() => {
-        const activeEditor = editorInstanceRef.current;
-        editorInstanceRef.current = null;
-
-        if (activeEditor && typeof activeEditor.unload === 'function') {
-            try {
-                activeEditor.unload();
-            } catch (error) {
-                console.warn('Error unloading fullscreen document editor:', error);
-            }
-        }
-    }, []);
-
-    const reloadDocumentContent = useCallback(() => {
-        setReloadKey((previous) => previous + 1);
-    }, []);
-
-    useEffect(() => {
-        if (!isEditing) {
-            setLoadError(null);
-            return;
-        }
-
-        const container = editorContainerRef.current;
-        if (!container) {
-            return;
-        }
-
-        let pollHandle = null;
-
-        const resetContainer = () => {
-            unloadDocumentEditor();
-            container.replaceChildren();
-        };
-
-        const tryMountDocument = () => {
-            if (!sourceFragmentId) {
-                setLoadError(new Error('Document source fragment is missing'));
-                resetContainer();
-                return true;
-            }
-
-            const fragment = getFragmentById(sourceFragmentId);
-            if (!fragment) {
-                setLoadError(new Error(`Fragment not found: ${sourceFragmentId}`));
-                resetContainer();
-                return true;
-            }
-
-            if (!window.EditorManager?.createEditor) {
-                return false;
-            }
-
-            try {
-                resetContainer();
-                const editors = window.EditorManager.createEditor(fragment, { theme: 'light', mode: 'full' });
-                const editorInstance = Array.isArray(editors) ? editors[0] : editors;
-                const editorNode = getEditorRootNode(editorInstance);
-
-                if (!editorInstance || !editorNode) {
-                    setLoadError(new Error('Unable to create document preview editor'));
-                    resetContainer();
-                    return true;
-                }
-
-                editorInstanceRef.current = editorInstance;
-                container.replaceChildren(editorNode);
-                setLoadError(null);
-
-                if (typeof editorInstance.focus === 'function') {
-                    requestAnimationFrame(() => {
-                        try {
-                            editorInstance.focus();
-                        } catch (focusError) {
-                        }
-                    });
-                }
-
-                return true;
-            } catch (error) {
-                console.error('Error loading document for fullscreen:', error);
-                setLoadError(error);
-                resetContainer();
-                return true;
-            }
-        };
-
-        const mounted = tryMountDocument();
-        if (!mounted) {
-            pollHandle = window.setInterval(() => {
-                const mountedInPoll = tryMountDocument();
-                if (mountedInPoll && pollHandle) {
-                    window.clearInterval(pollHandle);
-                    pollHandle = null;
-                }
-            }, DOCUMENT_DEPENDENCY_POLL_INTERVAL_MS);
-        }
-
-        return () => {
-            if (pollHandle) {
-                window.clearInterval(pollHandle);
-            }
-            resetContainer();
-        };
-    }, [sourceFragmentId, reloadKey, unloadDocumentEditor, isEditing]);
+    const fragment = useDocumentFragment(window.tldrawEditor, shape?.id);
+    const fontSize = shape?.props?.fontSize ?? DEFAULT_DOCUMENT_FONT_SIZE;
 
     if (!shape) {
-        return <div className="widget-fullscreen-empty">No fullscreen document selected.</div>;
+        return <div className='widget-fullscreen-empty'>No fullscreen document selected.</div>;
     }
 
-    return <div className="shape-fullscreen-document">
+    return <div className='shape-fullscreen-document'>
         <div
-            key={isEditing ? 'fullscreen-document-editor-mode' : 'fullscreen-document-preview-mode'}
-            ref={editorContainerRef}
-            className="shape-fullscreen-document-editor"
+            className='shape-fullscreen-document-editor'
             style={{ '--document-shape-font-size': `${fontSize}px`, touchAction: 'auto' }}
         >
-            {!isEditing ? <ReactPreviewEditor fragmentId={sourceFragmentId} /> : null}
+            {isEditing
+                ? <ReactDocumentEditor fragment={fragment} />
+                : <ReactPreviewEditor fragment={fragment} />}
         </div>
-        {isEditing && loadError ? <FullscreenError error={loadError} errorType="Load" onRetry={reloadDocumentContent} /> : null}
     </div>;
 }
 
@@ -535,19 +390,9 @@ export function Main() {
     }, [setFullscreenShapeId]);
 
     const isFullscreenDocument = fullscreenShape?.type === 'Document';
-    const fullscreenDocumentFragmentId = isFullscreenDocument && typeof fullscreenShape?.props?.sourceFragmentId === 'string'
-        ? fullscreenShape.props.sourceFragmentId.trim()
-        : '';
     const fullscreenDocumentEditingState = {
-        isEditing: Boolean(
-            fullscreenShapeId
-            && isFullscreenDocument
-            && isFullscreenDocumentEditing
-            && fullscreenShape?.id
-            && fullscreenDocumentFragmentId
-        ),
-        shapeId: fullscreenShape?.id || null,
-        fragmentId: fullscreenDocumentFragmentId || null
+        isEditing: Boolean(fullscreenShapeId && isFullscreenDocument && isFullscreenDocumentEditing && fullscreenShape?.id),
+        shapeId: isFullscreenDocument ? fullscreenShape.id : null
     };
     fullscreenDocumentEditingStateRef.current = fullscreenDocumentEditingState;
     const fullscreenDocumentFontSize = isFullscreenDocument
@@ -581,13 +426,6 @@ export function Main() {
 
     const toggleFullscreenDocumentEditor = useCallback(() => {
         if (!fullscreenShape || fullscreenShape.type !== 'Document') {
-            return;
-        }
-
-        const sourceFragmentId = typeof fullscreenShape.props?.sourceFragmentId === 'string'
-            ? fullscreenShape.props.sourceFragmentId.trim()
-            : '';
-        if (!sourceFragmentId) {
             return;
         }
 
@@ -727,18 +565,8 @@ export function Main() {
     }, [fullscreenShapeId, isFullscreenDocumentEditing]);
 
     useEffect(() => {
-        if (!isFullscreenDocument) {
-            setIsFullscreenDocumentEditing(false);
-            return;
-        }
-
-        const sourceFragmentId = typeof fullscreenShape?.props?.sourceFragmentId === 'string'
-            ? fullscreenShape.props.sourceFragmentId.trim()
-            : '';
-        if (!sourceFragmentId) {
-            setIsFullscreenDocumentEditing(false);
-        }
-    }, [fullscreenShape?.id, fullscreenShape?.props?.sourceFragmentId, isFullscreenDocument]);
+        setIsFullscreenDocumentEditing(false);
+    }, [fullscreenShape?.id, isFullscreenDocument]);
 
     useEffect(() => {
         if (typeof triggerEvent !== 'function') {
@@ -749,8 +577,7 @@ export function Main() {
     }, [
         triggerEvent,
         fullscreenDocumentEditingState.isEditing,
-        fullscreenDocumentEditingState.shapeId,
-        fullscreenDocumentEditingState.fragmentId
+        fullscreenDocumentEditingState.shapeId
     ]);
 
     useEffect(() => {
@@ -777,7 +604,7 @@ export function Main() {
                 return;
             }
 
-            triggerEvent(FULLSCREEN_DOCUMENT_EDITING_CHANGED_EVENT, { isEditing: false, shapeId: null, fragmentId: null });
+            triggerEvent(FULLSCREEN_DOCUMENT_EDITING_CHANGED_EVENT, { isEditing: false, shapeId: null });
         };
     }, [triggerEvent]);
 

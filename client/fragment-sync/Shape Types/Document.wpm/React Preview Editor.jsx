@@ -1,21 +1,6 @@
 import React from 'react';
 const { useEffect, useMemo, useRef, useState } = React;
 
-function getFragmentById(fragmentId) {
-    if (typeof fragmentId !== 'string' || fragmentId.trim() === '') {
-        return null;
-    }
-
-    const trimmedFragmentId = fragmentId.trim();
-    const selector = trimmedFragmentId.startsWith('#') ? trimmedFragmentId : '#' + trimmedFragmentId;
-
-    try {
-        return Fragment.one(selector);
-    } catch (error) {
-        return null;
-    }
-}
-
 function getRenderableOutput(requiredModule) {
     if (requiredModule === null || requiredModule === undefined) {
         return '';
@@ -137,7 +122,7 @@ function serializeToHtml(value) {
     return String(value);
 }
 
-export function ReactPreviewEditor({ fragmentId, className = '', style }) {
+export function ReactPreviewEditor({ fragment, className = '', style }) {
     const [renderMode, setRenderMode] = useState('html');
     const [htmlContent, setHtmlContent] = useState('');
     const [reactContent, setReactContent] = useState(null);
@@ -151,22 +136,12 @@ export function ReactPreviewEditor({ fragmentId, className = '', style }) {
 
     useEffect(() => {
         let isCancelled = false;
-        let attachedFragment = null;
-        let attachPollHandle = null;
         let loadRetryHandle = null;
 
         const clearPreviewContent = () => {
             setRenderMode('html');
             setReactContent(null);
             setHtmlContent('');
-        };
-
-        const stopAttachPoll = () => {
-            if (!attachPollHandle) {
-                return;
-            }
-            clearInterval(attachPollHandle);
-            attachPollHandle = null;
         };
 
         const clearLoadRetry = () => {
@@ -180,10 +155,10 @@ export function ReactPreviewEditor({ fragmentId, className = '', style }) {
         const scheduleLoadRetry = () => {
             clearLoadRetry();
             loadRetryHandle = setTimeout(() => {
-                if (isCancelled || !attachedFragment) {
+                if (isCancelled || !fragment) {
                     return;
                 }
-                loadOutput(attachedFragment);
+                loadOutput(fragment);
             }, 250);
         };
 
@@ -226,51 +201,20 @@ export function ReactPreviewEditor({ fragmentId, className = '', style }) {
         };
 
         const handleFragmentChanged = () => {
-            if (!attachedFragment) {
-                return;
-            }
-            loadOutput(attachedFragment);
+            loadOutput(fragment);
         };
-
-        const tryAttachFragment = () => {
-            if (attachedFragment || isCancelled) {
-                return;
-            }
-
-            const fragment = getFragmentById(fragmentId);
-            if (!fragment) {
-                return;
-            }
-
-            attachedFragment = fragment;
-            attachedFragment.registerOnFragmentChangedHandler(handleFragmentChanged);
-            stopAttachPoll();
-            loadOutput(attachedFragment);
-        };
-
-        if (typeof fragmentId !== 'string' || fragmentId.trim() === '') {
-            clearPreviewContent();
-            return () => { };
-        }
 
         clearPreviewContent();
-        tryAttachFragment();
-
-        if (!attachedFragment) {
-            attachPollHandle = setInterval(tryAttachFragment, 250);
-        }
+        if (!fragment) return;
+        fragment.registerOnFragmentChangedHandler(handleFragmentChanged);
+        loadOutput(fragment);
 
         return () => {
             isCancelled = true;
-            stopAttachPoll();
             clearLoadRetry();
-
-            if (attachedFragment) {
-                attachedFragment.unRegisterOnFragmentChangedHandler(handleFragmentChanged);
-            }
-            attachedFragment = null;
+            fragment.unRegisterOnFragmentChangedHandler(handleFragmentChanged);
         };
-    }, [fragmentId]);
+    }, [fragment]);
 
     if (renderMode === 'react') {
         return <div className={rootClassName} style={style}>
@@ -283,4 +227,114 @@ export function ReactPreviewEditor({ fragmentId, className = '', style }) {
         style={style}
         dangerouslySetInnerHTML={{ __html: htmlContent }}
     />;
+}
+
+export function createDocumentEditorClass(MonacoEditor) {
+    return class DocumentMonacoEditor extends MonacoEditor {
+        handleFragmentChanged() {
+            if (this.applyingDocumentText || !this.editor?.getModel()) return;
+            const text = this.fragment.raw;
+            if (this.getValue() === text) return;
+
+            const viewState = this.editor.saveViewState();
+            this.applyingDocumentText = true;
+            try {
+                this.setValue(text);
+                if (viewState) this.editor.restoreViewState(viewState);
+            } finally {
+                this.applyingDocumentText = false;
+            }
+        }
+
+        // Document shapes synchronize complete values. Queued fragment deltas
+        // may describe an older editor value, so always read the current text.
+        handleTextInserted() {
+            this.handleFragmentChanged();
+        }
+
+        handleTextDeleted() {
+            this.handleFragmentChanged();
+        }
+
+        handleModelChanged() {
+            if (this.applyingDocumentText || !this.editor?.getModel()) return;
+
+            this.applyingDocumentText = true;
+            try {
+                super.handleModelChanged();
+            } finally {
+                this.applyingDocumentText = false;
+            }
+
+            // Another shape update can win while the local edit is published.
+            this.handleFragmentChanged();
+        }
+    };
+}
+
+export function ReactDocumentEditor({ fragment }) {
+    const containerRef = useRef(null);
+    const [loadError, setLoadError] = useState(null);
+
+    useEffect(() => {
+        const container = containerRef.current;
+        if (!fragment || !container) return;
+
+        let editorInstance = null;
+        let focusFrame = null;
+        setLoadError(null);
+
+        const tryMountEditor = () => {
+            if (!window.EditorManager?.createEditor || !window.MonacoEditor) return;
+
+            try {
+                if (!editorInstance) {
+                    const editors = window.EditorManager.createEditor(fragment, {
+                        theme: 'light',
+                        mode: 'full',
+                        editor: createDocumentEditorClass(window.MonacoEditor)
+                    });
+                    editorInstance = Array.isArray(editors) ? editors[0] : editors;
+                }
+
+                const root = editorInstance?.html?.[0] || editorInstance?.html;
+                if (!(root instanceof Node)) return;
+                if (root.parentNode !== container) container.replaceChildren(root);
+
+                const monacoEditor = editorInstance.editor;
+                if (!monacoEditor?.updateOptions) return;
+                editorInstance.setWordwrap?.(true);
+                monacoEditor.updateOptions({
+                    hover: { enabled: false },
+                    quickSuggestions: false,
+                    suggestOnTriggerCharacters: false,
+                    parameterHints: { enabled: false },
+                    wordBasedSuggestions: 'off',
+                    snippetSuggestions: 'none',
+                    tabCompletion: 'off'
+                });
+                clearInterval(pollHandle);
+                focusFrame = requestAnimationFrame(() => editorInstance?.focus?.());
+            } catch (error) {
+                clearInterval(pollHandle);
+                setLoadError(error);
+            }
+        };
+
+        const pollHandle = setInterval(tryMountEditor, 120);
+        tryMountEditor();
+
+        return () => {
+            clearInterval(pollHandle);
+            cancelAnimationFrame(focusFrame);
+            editorInstance?.unload?.();
+            editorInstance = null;
+            container.replaceChildren();
+        };
+    }, [fragment]);
+
+    return <div className='document-source-editor' style={{ width: '100%', height: '100%' }}>
+        <div ref={containerRef} style={{ width: '100%', height: '100%' }} />
+        {loadError ? <div role='alert'>Unable to open document editor: {loadError.message}</div> : null}
+    </div>;
 }

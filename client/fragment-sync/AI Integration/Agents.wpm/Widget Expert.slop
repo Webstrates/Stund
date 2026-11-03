@@ -449,13 +449,13 @@ The following libraries are available and can be imported:
 - tldraw Editor API: Access to the tldraw editor instance
   import { useEditor } from 'tldraw';
   const editor = useEditor();
-- For reading shape text, use props.richText (do not rely on props.text being present)
+- For reading ordinary shape text, use props.richText; Document shapes use props.text
 - For text content in shape writes, either:
   - set props.text directly (it will be converted to richText by helpers), or
   - use toRichText and set props.richText explicitly
-- For Document shapes, markdown content is stored in linked document fragments (via props.sourceFragmentId), not in props.text
+- For Document shapes, Markdown content is stored directly in props.text and the title in props.name
 - Note that "black" notes appear yellow on the canvas
-- When adding longer note-like content to the board, use the "Document" shape type with a linked document fragment for better editing and formatting capabilities
+- When adding longer note-like content to the board, use the "Document" shape type for better editing and formatting capabilities
 
 
 ## tldraw Helpers
@@ -478,21 +478,21 @@ The following libraries are available and can be imported:
 
 ## Document Helpers
 
-- Create a new markdown document fragment:
-  import { createDocumentFragment } from '#Agents .widget-helpers';
-  const fragmentId = createDocumentFragment('My Document', '# Title\\n\\nBody');
-- Read markdown text by fragment ID:
-  import { getDocumentFragmentTextByFragmentId } from '#Agents .widget-helpers';
-  const text = getDocumentFragmentTextByFragmentId(fragmentId);
-- Update markdown text by fragment ID:
-  import { setDocumentFragmentTextByFragmentId } from '#Agents .widget-helpers';
-  const ok = setDocumentFragmentTextByFragmentId(fragmentId, '# Updated');
-- Read document name by fragment ID:
-  import { getDocumentFragmentNameByFragmentId } from '#Agents .widget-helpers';
-  const name = getDocumentFragmentNameByFragmentId(fragmentId);
-- Update document name by fragment ID:
-  import { setDocumentFragmentNameByFragmentId } from '#Agents .widget-helpers';
-  const ok = setDocumentFragmentNameByFragmentId(fragmentId, 'Updated Name');
+- Create a new self-contained Markdown Document shape:
+  import { createDocument } from '#Agents .widget-helpers';
+  const shapeId = createDocument('My Document', '# Title\\n\\nBody');
+- Read markdown text by shape ID:
+  import { getDocumentText } from '#Agents .widget-helpers';
+  const text = getDocumentText(shapeId);
+- Update markdown text by shape ID:
+  import { setDocumentText } from '#Agents .widget-helpers';
+  const ok = setDocumentText(shapeId, '# Updated');
+- Read document name by shape ID:
+  import { getDocumentName } from '#Agents .widget-helpers';
+  const name = getDocumentName(shapeId);
+- Update document name by shape ID:
+  import { setDocumentName } from '#Agents .widget-helpers';
+  const ok = setDocumentName(shapeId, 'Updated Name');
 
 
 ## Persisted State

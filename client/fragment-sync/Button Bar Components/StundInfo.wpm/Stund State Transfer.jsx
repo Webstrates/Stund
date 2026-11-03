@@ -1,6 +1,6 @@
 import { zipSync, unzipSync, strFromU8, strToU8 } from 'fflate';
 import { setDOMState } from '#CoreHelpers .dom-store';
-import { safeJsonParse } from '#CoreHelpers .string-utils';
+import { safeJsonParse, readLastJsonObject } from '#CoreHelpers .string-utils';
 import {
     DEFAULT_SESSION_HISTORY_SERVER,
     normalizeSessionHistoryServerUrl
@@ -27,7 +27,6 @@ const ACTIVITY_SESSION_SERVER_KEY = 'history-model-server';
 
 const DEFAULT_SELECTION = Object.freeze({
     canvasState: true,
-    documentFragments: true,
     widgetFragments: true,
     processorFragments: true,
     widgetState: true,
@@ -86,6 +85,8 @@ function normalizeSelection(selectionInput = {}) {
         ...(selectionInput || {})
     };
 
+    delete normalized.documentFragments;
+
     Object.keys(DEFAULT_SELECTION).forEach((key) => {
         normalized[key] = Boolean(normalized[key]);
     });
@@ -116,9 +117,9 @@ function readCanvasRecordsFromDocument(doc = document) {
             return;
         }
 
-        const raw = childNode.textContent || '';
-        const parsedRecord = safeJsonParse(raw, null);
-        if (parsedRecord && typeof parsedRecord.id === 'string' && parsedRecord.id.trim()) {
+        const expectedId = `${childNode.tagName.toLowerCase()}:${childNode.id}`;
+        const parsedRecord = readLastJsonObject(childNode, (value) => value.id === expectedId);
+        if (parsedRecord) {
             records.push(parsedRecord);
         }
     });
@@ -133,7 +134,7 @@ function readCanvasSchemaFromDocument(doc = document) {
         return null;
     }
 
-    const schema = safeJsonParse(schemaElement.textContent || '', null);
+    const schema = readLastJsonObject(schemaElement);
     return isObject(schema) ? schema : null;
 }
 
@@ -213,7 +214,7 @@ function serializeWidgetStores(doc) {
         .filter(Boolean);
 }
 
-function serializeDocumentMarkdownFragments(doc) {
+function serializeLegacyDocumentFragments(doc) {
     const container = doc.querySelector(DOCUMENT_FRAGMENT_CONTAINER_SELECTOR);
     if (!container) {
         return [];
@@ -279,10 +280,6 @@ function buildExportPayload(doc, workspaceUrl, selectionInput) {
         if (canvasSchema) {
             data.canvasSchema = canvasSchema;
         }
-    }
-
-    if (selection.documentFragments) {
-        data.documentFragments = serializeDocumentMarkdownFragments(doc);
     }
 
     if (selection.widgetFragments) {
@@ -577,6 +574,35 @@ function upsertWidgetStores(rawStores) {
     return updatedCount;
 }
 
+function inlineLegacyDocumentContent(records, rawFragments, warnings) {
+    const fragmentsById = new Map();
+    (Array.isArray(rawFragments) ? rawFragments : []).forEach((entry) => {
+        if (!isObject(entry) || typeof entry.id !== 'string') return;
+        const element = parseFragmentHtml(entry.html);
+        if (element?.tagName.toLowerCase() === 'code-fragment'
+            && element.getAttribute('data-type') === 'text/markdown') {
+            fragmentsById.set(entry.id, element);
+        }
+    });
+
+    return (Array.isArray(records) ? records : []).map((record) => {
+        if (record?.typeName !== 'shape' || record.type !== 'Document') return record;
+
+        const { sourceFragmentId, ...props } = record.props || {};
+        const hasInlineText = typeof props.text === 'string';
+        const legacyFragment = fragmentsById.get(sourceFragmentId);
+        if (!hasInlineText) {
+            props.text = legacyFragment?.textContent ?? '';
+            if (sourceFragmentId && !legacyFragment) {
+                warnings.push(`Document "${props.name || record.id}" references missing fragment "${sourceFragmentId}" and was imported empty.`);
+            }
+            props.name = legacyFragment?.getAttribute('name')?.trim() || props.name || 'Untitled Document';
+        }
+        props.name = props.name || 'Untitled Document';
+        return { ...record, props };
+    });
+}
+
 function applyCanvasRecords(records, schema = null) {
     const canvasElement = document.querySelector(CANVAS_SELECTOR);
     if (!canvasElement) {
@@ -779,6 +805,9 @@ async function importPayload(payloadInput, selectionInput, options = {}) {
     const selection = normalizeSelection(selectionInput);
     const data = payload.data || {};
     const warnings = [];
+    const canvasRecords = selection.canvasState
+        ? inlineLegacyDocumentContent(data.canvasRecords, data.documentFragments, warnings)
+        : [];
 
     let importedAssetCount = 0;
     const zipAssetEntries = Array.isArray(options.zipAssetEntries) ? options.zipAssetEntries : [];
@@ -814,10 +843,6 @@ async function importPayload(payloadInput, selectionInput, options = {}) {
         ? upsertCodeFragments(WIDGET_FRAGMENT_CONTAINER_SELECTOR, data.widgetFragments)
         : 0;
 
-    const documentFragmentCount = selection.documentFragments
-        ? upsertCodeFragments(DOCUMENT_FRAGMENT_CONTAINER_SELECTOR, data.documentFragments)
-        : 0;
-
     const processorFragmentCount = selection.processorFragments
         ? upsertCodeFragments(PROCESSOR_FRAGMENT_CONTAINER_SELECTOR, data.processorFragments)
         : 0;
@@ -833,7 +858,7 @@ async function importPayload(payloadInput, selectionInput, options = {}) {
     }
 
     const canvasRecordCount = selection.canvasState
-        ? applyCanvasRecords(data.canvasRecords, data.canvasSchema)
+        ? applyCanvasRecords(canvasRecords, data.canvasSchema)
         : 0;
 
     return {
@@ -842,7 +867,6 @@ async function importPayload(payloadInput, selectionInput, options = {}) {
         summary: {
             canvasRecordCount,
             canvasSchemaIncluded: isObject(data.canvasSchema),
-            documentFragmentCount,
             widgetFragmentCount,
             processorFragmentCount,
             widgetStoreCount,
@@ -956,7 +980,6 @@ export async function exportStateToFile(selectionInput = {}) {
     const summary = {
         canvasRecordCount: Array.isArray(payload.data.canvasRecords) ? payload.data.canvasRecords.length : 0,
         canvasSchemaIncluded: isObject(payload.data.canvasSchema),
-        documentFragmentCount: Array.isArray(payload.data.documentFragments) ? payload.data.documentFragments.length : 0,
         widgetFragmentCount: Array.isArray(payload.data.widgetFragments) ? payload.data.widgetFragments.length : 0,
         processorFragmentCount: Array.isArray(payload.data.processorFragments) ? payload.data.processorFragments.length : 0,
         widgetStoreCount: Array.isArray(payload.data.widgetStores) ? payload.data.widgetStores.length : 0,
@@ -1026,6 +1049,11 @@ export async function importStateFromWorkspaceUrl(workspaceUrl, selectionInput =
         const selection = normalizeSelection(selectionInput);
         const built = buildExportPayload(sourceDoc, sourceUrl, selection);
         const payload = built.payload;
+        // Read old source fragments only at the import boundary. New exports
+        // carry document content exclusively inside their canvas records.
+        if (selection.canvasState) {
+            payload.data.documentFragments = serializeLegacyDocumentFragments(sourceDoc);
+        }
 
         let urlAssetReferences = [];
         if (selection.canvasImageAssets) {

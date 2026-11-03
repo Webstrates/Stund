@@ -5,7 +5,6 @@ import { useTransientDOMState } from '#CoreHelpers .dom-store';
 import { useCookieState } from '#CoreHelpers .cookie-store';
 import { Dialog, DialogHeader, DialogToggleRow, Section } from '#Dialog .default';
 import { useSession, useSessionModel, resolveSchemaRefs } from '#SessionHistory .default';
-import { normalizeSessionHistoryServerUrl } from '#SessionHistory .api';
 
 
 const PROCESSOR_FRAGMENT_CONTAINER_ID = 'processor-fragments';
@@ -138,66 +137,42 @@ function HistoryServerField({
     setHistoryServerOverride,
     disabled
 }) {
-    const getDraftServerUrl = (serverUrl) => {
-        if (!serverUrl) {
-            return '';
-        }
-
-        try {
-            return normalizeSessionHistoryServerUrl(serverUrl);
-        } catch (error) {
-            return serverUrl;
-        }
-    };
-    const [draftServerUrl, setDraftServerUrl] = useState(() => getDraftServerUrl(historyServerOverride));
-    const [serverUrlError, setServerUrlError] = useState('');
+    const [draftServerUrl, setDraftServerUrl] = useState(historyServerOverride || '');
     const inputFocusedRef = useRef(false);
     const skipNextBlurCommitRef = useRef(false);
 
     useEffect(() => {
         if (!inputFocusedRef.current) {
-            setDraftServerUrl(getDraftServerUrl(historyServerOverride));
-            setServerUrlError('');
+            setDraftServerUrl(historyServerOverride || '');
         }
     }, [historyServerOverride]);
 
+    // Stored as typed (trimmed); an empty value or the default means "use the default".
     const commitServerUrl = () => {
         const trimmedServerUrl = draftServerUrl.trim();
+        const serverOverride = trimmedServerUrl === defaultHistoryServer ? '' : trimmedServerUrl;
 
-        try {
-            const normalizedServerUrl = normalizeSessionHistoryServerUrl(trimmedServerUrl);
-            const normalizedOverride = normalizedServerUrl === defaultHistoryServer
-                ? ''
-                : normalizedServerUrl;
-
-            setHistoryServerOverride(normalizedOverride);
-            setDraftServerUrl(normalizedOverride);
-            setServerUrlError('');
-        } catch (error) {
-            setServerUrlError(formatErrorMessage(error, 'Enter a valid HTTP(S) server URL.'));
-        }
+        setHistoryServerOverride(serverOverride);
+        setDraftServerUrl(serverOverride);
     };
 
     return (
-        <div className={`session-history-server-setting ${serverUrlError ? 'invalid' : ''}`}>
+        <div className="session-history-server-setting">
             <label className="info-label" htmlFor="session-history-server-input">Session Server</label>
             <div className="session-history-server-input-container">
                 <input
                     id="session-history-server-input"
                     className="session-history-server-input"
-                    type="url"
+                    type="text"
                     value={draftServerUrl}
                     placeholder={defaultHistoryServer}
                     disabled={disabled}
-                    aria-invalid={serverUrlError ? 'true' : 'false'}
-                    aria-describedby={serverUrlError ? 'session-history-server-description' : undefined}
                     title="Session Server URL"
                     onFocus={() => {
                         inputFocusedRef.current = true;
                     }}
                     onChange={(event) => {
                         setDraftServerUrl(event.target.value);
-                        setServerUrlError('');
                     }}
                     onBlur={() => {
                         inputFocusedRef.current = false;
@@ -212,20 +187,11 @@ function HistoryServerField({
                             event.currentTarget.blur();
                         } else if (event.key === 'Escape') {
                             skipNextBlurCommitRef.current = true;
-                            setDraftServerUrl(getDraftServerUrl(historyServerOverride));
-                            setServerUrlError('');
+                            setDraftServerUrl(historyServerOverride || '');
                             event.currentTarget.blur();
                         }
                     }}
                 />
-                {serverUrlError ? (
-                    <span
-                        id="session-history-server-description"
-                        className="session-history-server-description"
-                    >
-                        {serverUrlError}
-                    </span>
-                ) : null}
             </div>
         </div>
     );
@@ -835,6 +801,88 @@ function EventList() {
     </>;
 }
 
+function AccessTokenSettings({ tokenState, sessionJoined, canGenerateAccessToken, busy, generateAccessToken, removeAccessToken }) {
+    const [password, setPassword] = useState('');
+    const [replacing, setReplacing] = useState(false);
+    const [generating, setGenerating] = useState(false);
+    const available = tokenState.status === 'available';
+    const showForm = !available || replacing;
+    const expiresLabel = tokenState.expires
+        ? new Date(tokenState.expires).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })
+        : '';
+    let hint = '';
+    if (tokenState.status === 'expired') {
+        hint = `Token expired${expiresLabel ? ` ${expiresLabel}` : ''}.${sessionJoined ? ' The current session stays connected.' : ''}`;
+    } else if (tokenState.status === 'rejected') {
+        hint = 'Token was not accepted by the server.';
+    }
+
+    useEffect(() => {
+        setPassword('');
+        setReplacing(false);
+    }, [tokenState.status, tokenState.expires]);
+
+    const submit = async (event) => {
+        event.preventDefault();
+        if (busy || generating || !password || !canGenerateAccessToken) return;
+        const submittedPassword = password;
+        setPassword('');
+        setGenerating(true);
+        try {
+            await generateAccessToken(submittedPassword);
+        } finally {
+            setGenerating(false);
+        }
+    };
+
+    const removeButton = <button
+        type="button"
+        className="dialog-action-button"
+        disabled={busy}
+        title="Remove the token saved in this browser and disconnect"
+        onClick={() => {
+            setPassword('');
+            setReplacing(false);
+            removeAccessToken();
+        }}
+    >
+        Clear
+    </button>;
+
+    return <div className="session-history-token" data-status={tokenState.status}>
+        <label className="info-label" htmlFor="history-token-password">Access Token</label>
+        <div className="token-content">
+            {showForm ? <form className="token-row" onSubmit={submit}>
+                <input
+                    id="history-token-password"
+                    className="token-password-input"
+                    type="text"
+                    autoComplete="off"
+                    spellCheck={false}
+                    placeholder="Password"
+                    title="Password provided by your administrator; only the generated token is saved in this browser"
+                    value={password}
+                    onChange={(event) => setPassword(event.target.value)}
+                    disabled={busy || !canGenerateAccessToken}
+                />
+                <button className="dialog-action-button" type="submit" disabled={busy || generating || !canGenerateAccessToken || !password}>
+                    {generating ? 'Generating…' : 'Generate Token'}
+                </button>
+                {replacing && <button className="dialog-action-button" type="button" disabled={busy} onClick={() => { setPassword(''); setReplacing(false); }}>Cancel</button>}
+                {!available && tokenState.status !== 'missing' && removeButton}
+            </form> : <div className="token-row">
+                <span className="token-status" role="status">Ready</span>
+                {expiresLabel && <span className="token-expiry">Expires {expiresLabel}</span>}
+                <div className="token-actions">
+                    <button type="button" className="dialog-action-button" disabled={busy} onClick={() => setReplacing(true)}>Replace</button>
+                    {removeButton}
+                </div>
+            </div>}
+            {hint && <span className="token-hint">{hint}</span>}
+        </div>
+    </div>;
+}
+
 export function Main() {
     const [visible, setVisible] = useTransientDOMState('session-history-visible', false);
     const {
@@ -847,7 +895,15 @@ export function Main() {
         setHistoryServerOverride,
         createSession,
         joinSession,
-        disconnectSession
+        clearSessionId,
+        disconnectSession,
+        tokenState,
+        hasAccessToken,
+        canGenerateAccessToken,
+        busy,
+        error,
+        generateAccessToken,
+        removeAccessToken
     } = useSession();
     const [stateRecorderActive, setStateRecorderActive] = useCookieState('stateRecorderActive', true);
     const [interactionRecorderActive, setInteractionRecorderActive] = useCookieState('interactionRecorderActive', true);
@@ -899,37 +955,59 @@ export function Main() {
                 historyServerOverride={historyServerOverride}
                 defaultHistoryServer={defaultHistoryServer}
                 setHistoryServerOverride={setHistoryServerOverride}
-                disabled={sessionJoined}
+                disabled={sessionJoined || busy}
             />
+            <AccessTokenSettings
+                tokenState={tokenState}
+                sessionJoined={sessionJoined}
+                canGenerateAccessToken={canGenerateAccessToken}
+                busy={busy}
+                generateAccessToken={generateAccessToken}
+                removeAccessToken={removeAccessToken}
+            />
+            {error && <p className="session-history-error" role="alert">{error}</p>}
             <div className="session-info-row">
-                <span className="info-label">Session ID</span>
-                {sessionId ? <span className="session-id">{sessionId}</span> : <span>No session ID found</span>}
+                <span className="info-label">Session</span>
+                <div className="session-id-details">
+                    {sessionId ? <span className="session-id">{sessionId}</span> : <span>No session</span>}
+                    <div className="session-id-actions">
+                        <button
+                            type="button"
+                            className="dialog-action-button"
+                            disabled={!sessionId || sessionJoined || busy}
+                            title={sessionJoined ? 'Disconnect Before Clearing the Session' : 'Clear Session'}
+                            onClick={clearSessionId}
+                        >
+                            Clear
+                        </button>
+                    </div>
+                </div>
             </div>
             <div className="session-info-row">
                 <span className="info-label">Connection</span>
-                <span className="session-joined" joined={sessionJoined ? 'yes' : 'no'}>{sessionJoined ? 'Connected' : 'Disconnected'}</span>
+                <span className="session-joined" joined={sessionJoined ? 'yes' : 'no'}>{sessionJoined ? 'Connected' : busy ? 'Working' : 'Disconnected'}</span>
             </div>
             <div className="toggle-button-group">
                 <button
                     className="dialog-action-button toggle-button"
                     onClick={createSession}
-                    disabled={sessionJoined}
-                    title="Create New Session"
+                    disabled={sessionJoined || busy || !hasAccessToken}
+                    title="Create and Join New Session"
                 >
-                    Create New Session
+                    Create and Join New Session
                 </button>
                 <button
                     className="dialog-action-button toggle-button"
                     onClick={joinSession}
-                    disabled={sessionJoined || !sessionId}
-                    title="Join Session"
+                    disabled={sessionJoined || busy || !hasAccessToken || !sessionId}
+                    title="Join Existing Session"
                 >
-                    Join Session
+                    Join Existing Session
                 </button>
                 <button
                     className="dialog-action-button toggle-button"
                     onClick={disconnectSession}
-                    disabled={!sessionJoined}
+                    disabled={!sessionJoined && !busy}
                     title="Disconnect From Session"
                 >
                     Disconnect

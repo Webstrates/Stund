@@ -4,8 +4,7 @@ import { Connector } from '#SlopScript .connector';
 
 export const DEFAULT_OPTIONS = {
     temperature: 1,
-    max_tokens: 8192,
-    drop_params: true
+    max_tokens: 8192
 };
 export const DEFAULT_TOOL_OPTIONS = {
     tool_choice: 'auto',

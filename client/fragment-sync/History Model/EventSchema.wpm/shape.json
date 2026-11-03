@@ -10,7 +10,7 @@
         },
         "type": {
             "type": "string",
-            "description": "The type of shape (e.g., 'note', 'text', 'geo', 'image', 'draw', 'ScreenStream', 'VideoStream')"
+            "description": "The type of shape (e.g., 'note', 'text', 'geo', 'image', 'draw', 'ScreenStream', 'VideoStream', 'Widget', 'Document')"
         },
         "x": {
             "type": "number",
@@ -44,7 +44,15 @@
                 },
                 "text": {
                     "type": "string",
-                    "description": "Plain text content for shape writes (notes, text, and geo shapes). This will be converted to richText automatically by helpers, but may not be present when reading shapes."
+                    "description": "Markdown content for Document shapes, retained on reads and writes. For ordinary notes, text, and geo shapes, plain text writes are converted to richText by helpers."
+                },
+                "name": {
+                    "type": "string",
+                    "description": "The display name of a Document or Widget shape"
+                },
+                "fontSize": {
+                    "type": "number",
+                    "description": "Preview font size for Document shapes"
                 },
                 "w": {
                     "type": "number",

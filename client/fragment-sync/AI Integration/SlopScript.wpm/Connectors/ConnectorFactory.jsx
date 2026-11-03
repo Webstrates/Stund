@@ -53,7 +53,7 @@ export const resetAPIKey = async (cookieName) => {
     console.log('API key reset. Please refresh the page to enter a new key.');
 };
 
-export const DEFAULT_LITELLM_URL = 'https://my-litellm-proxy.com';
+export const DEFAULT_LITELLM_URL = 'https://your-litellm-server.com';
 export const DEFAULT_OLLAMA_URL = 'http://localhost:11434';
 
 // Default public API base URLs (include the version segment, per the OpenAI
@@ -249,7 +249,7 @@ export async function getConnectorAuthHeaders(config) {
 /**
  * Create the connector currently selected in the Model Manager.
  *
- * The selection and the base URL are read from DOMState, so the same choice
+ * The selection and the base URL are read from the per-user connector cookies, so the same choice
  * applies everywhere connectors are instantiated — the AI Sidebar and the
  * sub-agents in Main Agent.slop.
  *

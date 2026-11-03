@@ -2,10 +2,11 @@ let manifestLink = document.head.querySelector('link[rel="manifest"]');
 if (!manifestLink) {
     manifestLink = document.createElement('link');
     manifestLink.setAttribute('rel', 'manifest');
-    manifestLink.setAttribute('href', 'manifest.json');
     document.head.appendChild(manifestLink);
     WPMv2.stripProtection(manifestLink);
 }
+
+manifestLink.setAttribute('href', 'manifest.json');
 
 let iconLink = document.head.querySelector('link[rel="icon"]');
 if (!iconLink) {

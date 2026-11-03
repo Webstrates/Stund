@@ -59,6 +59,10 @@ export const cleanShapeData = (shape) => ({
         ...(shape.props?.client && { client: shape.props.client }),
         ...(shape.props?.userName && { userName: shape.props.userName }),
 
+        // Documents own their Markdown, including intentionally empty text.
+        ...(shape.type === 'Document' && { text: shape.props?.text ?? '' }),
+        ...(shape.type === 'Document' && shape.props?.fontSize !== undefined && { fontSize: shape.props.fontSize }),
+
         // Widget
         ...(shape.props?.sourceFragmentId && { sourceFragmentId: shape.props.sourceFragmentId }),
         ...(shape.props?.name && { name: shape.props.name }),
