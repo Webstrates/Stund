@@ -1,0 +1,74 @@
+MIT License
+
+Copyright (c) 2025-2026 Janus Bager Kristensen, Marcel Borowski - Aarhus University
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+ -----------------------------------------------------------------------------
+
+The MIT license above applies to this project's own source code and to
+everything distributed in this repository EXCEPT the components listed below.
+
+Licensing exception for the vendored jars in server/libs/
+---------------------------------------------------------
+
+The jars vendored in server/libs/ (gst1-java-fixups) are separate works of
+their respective copyright holders, licensed under the GNU Lesser General
+Public License version 3 only. They are redistributed under the terms of that
+license — see server/libs/LICENSE for the notice, the license text and where
+the corresponding source code lives. The MIT grant above neither applies to
+nor covers those files.
+
+The runnable server JAR produced by the build shades (embeds compiled classes
+of) the LGPL-licensed gst1-java-fixups library: anyone distributing the
+runnable JAR receives those embedded parts under LGPL version 3. The
+corresponding source remains available in the -sources jar in server/libs/.
+server/THIRD-PARTY-NOTICES.txt lists every third-party component embedded in
+the JAR and its license.
+
+Licensing exception for Apache-2.0 components in client/
+--------------------------------------------------------
+
+The following components are embedded in the client and remain licensed under
+the Apache License, Version 2.0, as stated in their headers or package
+descriptors. The full license text is in client/licenses/Apache-2.0.txt.
+
+- WPMv2 - Webstrate Package Manager
+  Copyright 2019 Rolf Bagge, Janus Bager Kristensen, CAVI - Center for
+  Advanced Visualisation and Interaction, Aarhus University
+  Embedded in client/prototypes/stund/index.html (and client/prototypes/stund.zip)
+  and client/repository/stund.html.
+
+- SlopScript
+  Copyright 2025 Janus B. Kristensen, CAVI, Center for Advanced Visualization
+  and Interaction, Aarhus University
+  In client/fragment-sync/AI Integration/SlopScript.wpm/ and embedded in the
+  prototype and repository files above.
+
+- FragmentFilesystemSync (Codestrates package)
+  Embedded in client/prototypes/stund/index.html (and client/prototypes/stund.zip).
+
+Run-time dependencies
+---------------------
+
+Libraries the client loads at run time from CDNs (e.g., React and tldraw via
+esm.sh) and native libraries the server expects on the system (e.g.,
+GStreamer, libnice and TEN VAD) are not distributed in this repository and
+remain under their own licenses. Note in particular that tldraw is not open
+source: its license requires a license key for production use.

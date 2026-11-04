@@ -11,17 +11,12 @@
 
 # SessionHistoryServer
 
-[![DOI](https://img.shields.io/badge/DOI-10.1145%2F3830398.3830508-blue)](https://doi.org/10.1145/3830398.3830508)
-[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![Java](https://img.shields.io/badge/Java-17-orange)](https://openjdk.java.net/projects/jdk/17/)
 An embedded-Jetty server that records and replays sessions of synchronized
 event and media streams: WebRTC media ingest via GStreamer, a websocket
 command API, queryable timed-event history, pluggable AI processors
 (OpenAI-compatible) and GraalVM polyglot JavaScript scripting.
 
-SessionHistoryServer is the session-history component of **Stund**, an
-activity-enriched collaborative workspace (UIST '26 — [paper][paper],
-[video][video]).
+SessionHistoryServer is the activity session server of [Stund](../README.md).
 
 ## Getting started
 
@@ -60,7 +55,7 @@ loudly, and every session request is rejected until one is set:
 '{"auth": {"masterPassword": "a secret of yours"}}'
 ```
 
-`config.json` is read from the server's working directory — the repo root, if that is where you run the jar
+`config.json` is read from the server's working directory — the `server` folder, if that is where you run the jar
 (a writable `sessions/` ships there; from anywhere else create one, or pass `-Dsession.basePath`). Keys the
 file leaves out keep the built-in default — the full template is [config.json.sample](config.json.sample).
 
@@ -542,7 +537,7 @@ library directory. The self-test verifies the whole chain. Note that
 the sessions base directory (the `session.basePath` property, `sessions`
 by default, resolved relative to the working directory) must exist and
 be writable — the server checks at startup — so from a directory other
-than the repo root, also create a `sessions/` directory there or pass
+than the `server` folder, also create a `sessions/` directory there or pass
 `-Dsession.basePath` (see the property table above).
 
 Note: the upstream x86-64 prebuilt is an older, self-contained DSP
@@ -638,29 +633,10 @@ move any pin forward, edit the `ARG` values at the top of the
 `Dockerfile` (or override them with
 `docker build --build-arg ONNXRUNTIME_VERSION=...`).
 
-## Publications and citation
+## Third-party components
 
-The research behind this system is published as part of **Stund**, an
-activity-enriched collaborative workspace, at UIST 2026:
-
-> Marcel Borowski, Janus Bager Kristensen, Payod Panda, Sean Rintel,
-> Niklas Elmqvist, Jens Emil Sloth Grønbæk, and Clemens Nylandsted
-> Klokmose. 2026. Stund: Activity-Enriched Collaborative Workspaces
-> Mediated by Artificial Intelligence. In *The 39th Annual ACM Symposium
-> on User Interface Software and Technology (UIST '26)*, November 02–05,
-> 2026, Detroit, MI, USA. ACM, New York, NY, USA, 14 pages.
-> <https://doi.org/10.1145/3830398.3830508>
-
-- 📄 Paper: <https://doi.org/10.1145/3830398.3830508>
-- 🎬 Video: <https://www.youtube.com/watch?v=QjgDFruIFh0>
-
-See [CITATION.cff](CITATION.cff) for machine-readable citation metadata
-(BibTeX-ready on GitHub).
-
-
-## License
-
-This project is released under the MIT License — see [LICENSE](LICENSE),
+The server is released under the MIT License as part of Stund — see
+[LICENSE](../LICENSE) in the repository root,
 with one exception: **GNU LGPL version 3 only** components are used
 by the server - the jars are vendored in [`libs/`](libs/) (the
 `gst1-java-fixups` GStreamer WebRTC/GBytes bindings; notice and license
@@ -680,7 +656,4 @@ demux-only FFmpeg, both LGPL-2.1, plus GPAC's bundled QuickJS, MIT)
 and ships the single statically linked binary, so redistributing the
 image redistributes those too;
 the pins and provenance notes travel in the `Dockerfile`.
-
-[paper]: https://doi.org/10.1145/3830398.3830508
-[video]: https://www.youtube.com/watch?v=QjgDFruIFh0
 

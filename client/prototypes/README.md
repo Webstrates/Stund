@@ -3,9 +3,9 @@
 The files in this folder are used to create instances of Stund on a Webstrates server using a prototype ZIP archive (see more info in the [Webstrates documentation](https://webstrates.github.io/userguide/api/prototype-restore-delete.html)).
 
 
-## Folders and ZIP Files
+## Folder and ZIP File
 
-The ZIP files are the packaged prototypes in a format that can be uploaded to a Webstrates server. The `assets` folder contains the Webstrates assets that are also included in the ZIP files. The other two folders contain the same `index.html` as the respective ZIP file and are intended to help to keep track of version changes as these are otherwise opaque in the ZIP files.
+The `stund.zip` file is the packaged prototype in a format that can be uploaded to a Webstrates server. The `stund` folder contains the same `index.html` and assets as the ZIP file and is intended to help to keep track of version changes as these are otherwise opaque in the ZIP file.
 
 
 ## Embedded Packages
@@ -15,9 +15,9 @@ The prototype of Stund embeds the Stund packages into the webstrate. Changes fro
 
 ## Creating a Copy
 
-You can use one of the following link to create a new stund:
+You can use the following link to create a new stund:
 
-> https://demo.webstrates.net/new?prototypeUrl=https://github.com/Webstrates/Stund/raw/main/prototypes/stund.zip
+> https://demo.webstrates.net/new?prototypeUrl=https://github.com/Webstrates/Stund/raw/main/client/prototypes/stund.zip
 
 
 ## Updating the Prototype

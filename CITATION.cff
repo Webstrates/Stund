@@ -1,0 +1,123 @@
+# Citation file for Stund (CFF 1.2.0 — https://citation-file-format.github.io)
+cff-version: 1.2.0
+title: Stund
+message: >-
+  If you use this software, please cite both the software (this file)
+  and the accompanying paper (preferred-citation below).
+type: software
+authors:
+  - family-names: Kristensen
+    given-names: Janus Bager
+    email: jbk@cavi.au.dk
+    affiliation: "CAVI, Center for Advanced Visualization and Interaction, Aarhus University"
+    orcid: "https://orcid.org/0009-0008-9886-3256"
+  - family-names: Borowski
+    given-names: Marcel
+    email: marcel.borowski@cs.au.dk
+    affiliation: "Department of Computer Science, Aarhus University"
+    orcid: "https://orcid.org/0000-0003-4403-765X"
+license: MIT
+repository-code: "https://github.com/Webstrates/Stund"
+url: "https://github.com/Webstrates/Stund"
+abstract: >-
+  Stund is an activity-enriched collaborative workspace mediated by
+  artificial intelligence. Its Webstrates-based web client provides a
+  shared, malleable 2D canvas built on tldraw and an AI chat whose
+  agents can act on the canvas, create widgets and processors, and
+  query the activity history. Its activity session server,
+  SessionHistoryServer, records collaborative activity as queryable,
+  timed events: voice, video, notes and edits land as events on a
+  shared timeline, media is recorded via WebRTC ingest into Matroska
+  files that are servable while still growing, and pluggable
+  processors (including sandboxed JavaScript and OpenAI-compatible LLM
+  processors) derive new events, live or over recorded sessions.
+keywords:
+  - activity-enriched computing
+  - collaboration
+  - collaborative workspaces
+  - Webstrates
+  - event sourcing
+  - session recording
+  - WebRTC
+  - GStreamer
+  - malleable software
+  - AI-as-medium
+preferred-citation:
+  type: conference-paper
+  title: "Stund: Activity-Enriched Collaborative Workspaces Mediated by Artificial Intelligence"
+  collection-type: proceedings
+  collection-title: "Proceedings of the 39th Annual ACM Symposium on User Interface Software and Technology"
+  authors:
+    - family-names: Borowski
+      given-names: Marcel
+      email: marcel.borowski@cs.au.dk
+      affiliation: "Aarhus University"
+      orcid: "https://orcid.org/0000-0003-4403-765X"
+    - family-names: Kristensen
+      given-names: Janus Bager
+      email: jbk@cavi.au.dk
+      affiliation: "Aarhus University"
+      orcid: "https://orcid.org/0009-0008-9886-3256"
+    - family-names: Panda
+      given-names: Payod
+      email: payodpanda@microsoft.com
+      affiliation: "Microsoft Research"
+      orcid: "https://orcid.org/0000-0002-8208-4185"
+    - family-names: Rintel
+      given-names: Sean
+      email: serintel@microsoft.com
+      affiliation: "Microsoft Research"
+      orcid: "https://orcid.org/0000-0003-0840-0546"
+    - family-names: Elmqvist
+      given-names: Niklas
+      email: elm@cs.au.dk
+      affiliation: "Aarhus University"
+      orcid: "https://orcid.org/0000-0001-5805-5301"
+    - family-names: Grønbæk
+      given-names: Jens Emil Sloth
+      email: jensemil@cs.au.dk
+      affiliation: "Aarhus University"
+      orcid: "https://orcid.org/0000-0002-9566-7195"
+    - family-names: Klokmose
+      given-names: Clemens Nylandsted
+      email: clemens@cs.au.dk
+      affiliation: "Aarhus University"
+      orcid: "https://orcid.org/0000-0002-1866-0619"
+  year: 2026
+  conference:
+    name: "The 39th Annual ACM Symposium on User Interface Software and Technology (UIST '26)"
+    address: "Detroit, Michigan, USA"
+    date-start: "2026-11-02"
+    date-end: "2026-11-05"
+  publisher:
+    name: "Association for Computing Machinery"
+    address: "New York, NY, USA"
+  isbn: "9798400728563"
+  doi: "10.1145/3830398.3830508"
+  url: "https://doi.org/10.1145/3830398.3830508"
+  pages: 14
+  keywords:
+    - Activity-Enriched Computing
+    - Collaboration
+    - Substrates
+    - Malleable Software
+    - Reification
+    - AI-as-Medium
+  abstract: >-
+    Time is a second-class citizen in most collaborative software:
+    activity traces are fragmented across tools or entirely ephemeral.
+    We introduce Stund, an activity-enriched collaborative workspace where
+    all activities—voice, video, interactions, and content edits—leave
+    traces that become part of the medium of the ongoing collaboration.
+    Unlike traditional chatbots or meeting assistants, artificial
+    intelligence (AI) is embedded in the medium as well, allowing users to
+    directly leverage traces through it. We demonstrate this through
+    scenarios such as: spontaneously creating an instrument during the
+    meeting to play back the recorded conversation around a particular
+    spreadsheet edit; automatically detecting when someone is absent to
+    summarize what was missed when they return; or detecting and
+    resurfacing when sticky notes have been shaken in excitement when
+    ideas are presented. The entire workspace is queryable,
+    transformable, and reifiable through AI. Stund introduces a new
+    approach to malleable collaborative software, where activity traces
+    and AI are an integral part of the workspace medium.

@@ -44,7 +44,7 @@ npx mocha --no-config --timeout 60000 --exit ./4-ingest.mjs
 ### Prerequisites
 
 - **A running server** — by default at `http://localhost:3001`. Build and
-  start one from the repo root:
+  start one from the `server` folder:
   ```bash
   mvn package
   java -Djna.library.path=<ten-vad-dir> -jar target/SessionHistoryServer-*.jar
@@ -55,9 +55,9 @@ npx mocha --no-config --timeout 60000 --exit ./4-ingest.mjs
   next to it; the prebuilt x86-64 one does not).
 - **The server's master password** — the server under test demands an
   entityKey on everything under `/session`, so the tests must log in.
-  The password is read from `SHS_MASTER_PASSWORD` or the repo root's
+  The password is read from `SHS_MASTER_PASSWORD` or the `server` folder's
   `config.json` (`{"auth": {"masterPassword": "..."}}` — that file is
-  untracked, see the main README). Tests that need it skip themselves
+  untracked, see the server README). Tests that need it skip themselves
   with an explanation when neither is set. The servers spawned by the
   tests (files 0 and 7) write their own generated master password into
   their working directory, so they never depend on this.
@@ -81,7 +81,7 @@ npx mocha --no-config --timeout 60000 --exit ./4-ingest.mjs
 | Variable | Meaning | Default |
 |---|---|---|
 | `SHS_URL` | base URL of the server under test | `http://localhost:3001` |
-| `SHS_MASTER_PASSWORD` | master password of the server under test | `auth.masterPassword` in the repo root's `config.json` |
+| `SHS_MASTER_PASSWORD` | master password of the server under test | `auth.masterPassword` in the `server` folder's `config.json` |
 | `SHS_BROWSER` | Chromium/Chrome executable for puppeteer | first of `/usr/bin/chromium`, … |
 | `SHS_JAR` | jar used by the spawned-server tests | newest `target/SessionHistoryServer-*.jar` |
 | `SHS_TEN_VAD` | directory with `libten_vad.so` + `onnx_model` | `/tmp/tenvad-arm64`, `/usr/local/lib` |
